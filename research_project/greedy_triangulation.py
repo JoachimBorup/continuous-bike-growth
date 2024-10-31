@@ -1,29 +1,50 @@
-def greedy_triangulation_routing(G, pois, prune_quantiles=[1], prune_measure="betweenness"):
-    """Greedy Triangulation (GT) of a graph G's node subset pois,
-    then routing to connect the GT (up to a quantile of betweenness
-    betweenness_quantile).
-    G is an ipgraph graph, pois is a list of node ids.
+from typing import Optional
 
-    The GT connects pairs of nodes in ascending order of their distance provided
-    that no edge crossing is introduced. It leads to a maximal connected planar
-    graph, while minimizing the total length of edges considered. 
-    See: cardillo2006spp
+import igraph as ig
 
-    Distance here is routing distance, while edge crossing is checked on an abstract 
-    level.
+
+def greedy_triangulation_routing(
+    graph: ig.Graph,
+    pois: list[int],
+    prune_quantiles: Optional[list[float]] = None,
+    prune_measure: str = "betweenness"
+) -> tuple[list[ig.Graph], list[ig.Graph]]:
     """
+    Perform Greedy Triangulation (GT) on a subset of nodes (points of interest, POIs) in a graph,
+    followed by routing to connect the GT graph up to a specified quantile of the chosen pruning measure.
 
+    This method builds a maximal connected planar subgraph by connecting pairs of POI nodes in ascending
+    order of their shortest path distances, ensuring that no edge crossings are introduced.
+    The GT is then routed to create a connected graph within the specified pruning quantiles, resulting
+    in a list of routed GTs and their abstract versions (Euclidean-based to track edge crossings).
+
+    :param graph: The input graph to perform GT and routing on.
+    :param pois: A list of node IDs in the graph representing the POIs to connect.
+    :param prune_quantiles: Quantile values specifying the degree of pruning applied to the GT.
+    Each quantile defines a pruned version of the GT graph based on the specified pruning measure.
+    If None, no pruning is applied (default is [1], representing no pruning).
+    :param prune_measure: The measure used for pruning edges in the GT.
+    The options are 'betweenness', 'closeness', and 'random' (default is 'betweenness').
+    :return: A tuple containing lists of the routed GTs and their abstract versions.
+
+    Reference:
+    Alessio Cardillo, Salvatore Scellato, Vito Latora, and Sergio Porta (2006).
+    Structural properties of planar graphs of urban street patterns.
+    Physical Review E, 73(6), 066107. https://doi.org/10.1103/PhysRevE.73.066107
+    """
+    if prune_quantiles is None:
+        prune_quantiles = [1]
     if len(pois) < 2: return ([], [])  # We can't do anything with less than 2 POIs
 
     # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
     pois_indices = set()
     for poi in pois:
-        pois_indices.add(G.vs.find(id=poi).index)
-    G_temp = copy.deepcopy(G)
+        pois_indices.add(graph.vs.find(id=poi).index)
+    G_temp = copy.deepcopy(graph)
     for e in G_temp.es:  # delete all edges
         G_temp.es.delete(e)
 
-    poipairs = poipairs_by_distance(G, pois, True)
+    poipairs = poipairs_by_distance(graph, pois, True)
     if len(poipairs) == 0: return ([], [])
 
     if prune_measure == "random":
@@ -57,11 +78,11 @@ def greedy_triangulation_routing(G, pois, prune_quantiles=[1], prune_measure="be
         # Do the routing
         GT_indices = set()
         for poipair, poipair_distance in routenodepairs:
-            poipair_ind = (G.vs.find(id=poipair[0]).index, G.vs.find(id=poipair[1]).index)
-            sp = set(G.get_shortest_paths(poipair_ind[0], poipair_ind[1], weights="weight", output="vpath")[0])
+            poipair_ind = (graph.vs.find(id=poipair[0]).index, graph.vs.find(id=poipair[1]).index)
+            sp = set(graph.get_shortest_paths(poipair_ind[0], poipair_ind[1], weights="weight", output="vpath")[0])
             GT_indices = GT_indices.union(sp)
 
-        GT = G.induced_subgraph(GT_indices)
+        GT = graph.induced_subgraph(GT_indices)
         GTs.append(GT)
 
     return (GTs, GT_abstracts)
