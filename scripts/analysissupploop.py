@@ -1,9 +1,9 @@
 debug = False
 
 exec(open("../parameters/parameters.py").read())
-exec(open("../code/path.py").read())
-exec(open("../code/setup.py").read())
-exec(open("../code/functions.py").read())
+exec(open("../src/path.py").read())
+exec(open("../src/setup.py").read())
+exec(open("../src/functions.py").read())
 
 if __name__ == '__main__':
     if len(sys.argv) > 1: # limit to specific city
