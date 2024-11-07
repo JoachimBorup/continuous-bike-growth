@@ -72,7 +72,7 @@ def greedy_triangulation_routing(
         random.seed(0)  # const seed for reproducibility
         edge_order = random.sample(range(GT.ecount()), k=GT.ecount())
     else:
-        edge_order = False
+        edge_order = None
 
     # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
     GT_abstracts = []
@@ -102,9 +102,15 @@ def greedy_triangulation_routing(
     return GTs, GT_abstracts
 
 
-def greedy_triangulation(GT, poipairs, prune_quantile=1, prune_measure="betweenness", edgeorder=False):
+def greedy_triangulation(
+    GT: ig.Graph,
+    poi_pairs: list[tuple[tuple[int, int], float]],
+    prune_quantile: float = 1,
+    prune_measure="betweenness",
+    edge_order: Optional[list[int]] = None
+):
     """Greedy Triangulation (GT) of a graph GT with an empty edge set.
-    Distances between pairs of nodes are given by poipairs.
+    Distances between pairs of nodes are given by poi_pairs.
 
     The GT connects pairs of nodes in ascending order of their distance provided
     that no edge crossing is introduced. It leads to a maximal connected planar
@@ -112,12 +118,14 @@ def greedy_triangulation(GT, poipairs, prune_quantile=1, prune_measure="betweenn
     See: cardillo2006spp
     """
 
-    for poipair, poipair_distance in poipairs:
-        poipair_ind = (GT.vs.find(id=poipair[0]).index, GT.vs.find(id=poipair[1]).index)
+    for poi_pair, distance in poi_pairs:
+        v = GT.vs.find(id=poi_pair[0]).index
+        w = GT.vs.find(id=poi_pair[1]).index
         if not new_edge_intersects(GT, (
-        GT.vs[poipair_ind[0]]["x"], GT.vs[poipair_ind[0]]["y"], GT.vs[poipair_ind[1]]["x"],
-        GT.vs[poipair_ind[1]]["y"])):
-            GT.add_edge(poipair_ind[0], poipair_ind[1], weight=poipair_distance)
+            GT.vs[v]["x"], GT.vs[v]["y"],
+            GT.vs[w]["x"], GT.vs[w]["y"]
+        )):
+            GT.add_edge(v, w, weight=distance)
 
     # Get the measure for pruning
     if prune_measure == "betweenness":
@@ -142,10 +150,10 @@ def greedy_triangulation(GT, poipairs, prune_quantile=1, prune_measure="betweenn
         GT = GT.induced_subgraph(sub_nodes)
     elif prune_measure == "random":
         ind = np.quantile(
-            np.arange(len(edgeorder)),
+            np.arange(len(edge_order)),
             prune_quantile,
             interpolation="lower"
         ) + 1  # "lower" and + 1 so smallest quantile has at least one edge
-        GT = GT.subgraph_edges(edgeorder[:ind])
+        GT = GT.subgraph_edges(edge_order[:ind])
 
     return GT
