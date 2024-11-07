@@ -28,10 +28,10 @@ def greedy_triangulation_routing(
     :param graph: The input graph to perform GT and routing on.
     :param pois: A list of node IDs in the graph representing the POIs to connect.
     :param prune_quantiles: Quantile values specifying the degree of pruning applied to the GT.
-    Each quantile defines a pruned version of the GT graph based on the specified pruning measure.
-    If None, no pruning is applied (default is [1], representing no pruning).
+        Each quantile defines a pruned version of the GT graph based on the specified pruning measure.
+        If None, no pruning is applied (default is [1], representing no pruning).
     :param prune_measure: The measure used for pruning edges in the GT.
-    The options are 'betweenness', 'closeness', and 'random' (default is 'betweenness').
+        The options are 'betweenness', 'closeness', and 'random' (default is 'betweenness').
     :return: A tuple containing lists of the routed GTs and their abstract versions.
 
     Reference:
@@ -56,30 +56,12 @@ def greedy_triangulation_routing(
     if len(poi_pairs) == 0:
         return [], []
 
-    if prune_measure == "random":
-        # Run the whole GT first
-        GT: ig.Graph = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
-        # Add edges between POIs in ascending order of distance
-        for poi_pair, distance in poi_pairs:
-            v = GT.vs.find(id=poi_pair[0]).index
-            w = GT.vs.find(id=poi_pair[1]).index
-            if not new_edge_intersects(GT, (
-                GT.vs[v]["x"], GT.vs[w]["y"],
-                GT.vs[v]["x"], GT.vs[w]["y"],
-            )):
-                GT.add_edge(v, w, weight=distance)
-        # Create a random order for the edges
-        random.seed(0)  # const seed for reproducibility
-        edge_order = random.sample(range(GT.ecount()), k=GT.ecount())
-    else:
-        edge_order = None
-
     # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
     GT_abstracts = []
     GTs = []
     for prune_quantile in tqdm(prune_quantiles, desc="Greedy triangulation", leave=False):
         GT_abstract = copy.deepcopy(edgeless_graph.subgraph(poi_indices))  # TODO: Pass non-empty graph to GT
-        GT_abstract = greedy_triangulation(GT_abstract, poi_pairs, prune_quantile, prune_measure, edge_order)
+        GT_abstract = greedy_triangulation(GT_abstract, poi_pairs, prune_quantile, prune_measure)
         GT_abstracts.append(GT_abstract)
 
         # Get node pairs we need to route, sorted by distance
@@ -107,8 +89,7 @@ def greedy_triangulation(
     poi_pairs: list[tuple[tuple[int, int], float]],
     prune_quantile: float = 1,
     prune_measure="betweenness",
-    edge_order: Optional[list[int]] = None
-):
+) -> ig.Graph:
     """Greedy Triangulation (GT) of a graph GT with an empty edge set.
     Distances between pairs of nodes are given by poi_pairs.
 
@@ -118,6 +99,7 @@ def greedy_triangulation(
     See: cardillo2006spp
     """
 
+    # Add edges between POIs in ascending order of distance
     for poi_pair, distance in poi_pairs:
         v = GT.vs.find(id=poi_pair[0]).index
         w = GT.vs.find(id=poi_pair[1]).index
@@ -149,6 +131,9 @@ def greedy_triangulation(
             GT.vs[c]["cc"] = CC[c]
         GT = GT.induced_subgraph(sub_nodes)
     elif prune_measure == "random":
+        # Create a random order for the edges
+        random.seed(0)  # const seed for reproducibility
+        edge_order = random.sample(range(GT.ecount()), k=GT.ecount())
         ind = np.quantile(
             np.arange(len(edge_order)),
             prune_quantile,
