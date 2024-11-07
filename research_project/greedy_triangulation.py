@@ -138,7 +138,7 @@ def greedy_triangulation(
         # Create a random order for the edges
         edge_order = random.sample(range(GT.ecount()), k=GT.ecount())
         # "lower" and + 1 so smallest quantile has at least one edge
-        index = np.quantile(np.arange(len(edge_order)), prune_quantile, interpolation="lower") + 1
+        index = np.quantile(np.arange(len(edge_order)), prune_quantile, method="lower") + 1
         return GT.subgraph_edges(edge_order[:index])
 
     raise ValueError(f"Unknown pruning measure: {prune_measure}")
