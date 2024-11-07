@@ -120,8 +120,9 @@ def greedy_triangulation(
             GT.es[c]["bw"] = BW[c]
             GT.es[c]["width"] = math.sqrt(BW[c] + 1) * 0.5
         # Prune
-        GT = GT.subgraph_edges(sub_edges)
-    elif prune_measure == "closeness":
+        return GT.subgraph_edges(sub_edges)
+
+    if prune_measure == "closeness":
         CC = GT.closeness(vertices=None, weights="weight")
         qt = np.quantile(CC, 1 - prune_quantile)
         sub_nodes = []
@@ -129,16 +130,15 @@ def greedy_triangulation(
             if CC[c] >= qt:
                 sub_nodes.append(c)
             GT.vs[c]["cc"] = CC[c]
-        GT = GT.induced_subgraph(sub_nodes)
-    elif prune_measure == "random":
-        # Create a random order for the edges
-        random.seed(0)  # const seed for reproducibility
-        edge_order = random.sample(range(GT.ecount()), k=GT.ecount())
-        ind = np.quantile(
-            np.arange(len(edge_order)),
-            prune_quantile,
-            interpolation="lower"
-        ) + 1  # "lower" and + 1 so smallest quantile has at least one edge
-        GT = GT.subgraph_edges(edge_order[:ind])
+        return GT.induced_subgraph(sub_nodes)
 
-    return GT
+    if prune_measure == "random":
+        # For reproducibility
+        random.seed(0)
+        # Create a random order for the edges
+        edge_order = random.sample(range(GT.ecount()), k=GT.ecount())
+        # "lower" and + 1 so smallest quantile has at least one edge
+        index = np.quantile(np.arange(len(edge_order)), prune_quantile, interpolation="lower") + 1
+        return GT.subgraph_edges(edge_order[:index])
+
+    raise ValueError(f"Unknown pruning measure: {prune_measure}")
