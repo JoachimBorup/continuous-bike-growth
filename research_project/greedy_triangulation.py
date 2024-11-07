@@ -109,36 +109,39 @@ def greedy_triangulation(
         )):
             GT.add_edge(v, w, weight=distance)
 
-    # Get the measure for pruning
+    return prune(GT, prune_quantile, prune_measure)
+
+
+def prune(graph, prune_quantile, prune_measure):
     if prune_measure == "betweenness":
-        BW = GT.edge_betweenness(directed=False, weights="weight")
+        BW = graph.edge_betweenness(directed=False, weights="weight")
         qt = np.quantile(BW, 1 - prune_quantile)
         sub_edges = []
-        for c, e in enumerate(GT.es):
+        for c, e in enumerate(graph.es):
             if BW[c] >= qt:
                 sub_edges.append(c)
-            GT.es[c]["bw"] = BW[c]
-            GT.es[c]["width"] = math.sqrt(BW[c] + 1) * 0.5
+            graph.es[c]["bw"] = BW[c]
+            graph.es[c]["width"] = math.sqrt(BW[c] + 1) * 0.5
         # Prune
-        return GT.subgraph_edges(sub_edges)
+        return graph.subgraph_edges(sub_edges)
 
     if prune_measure == "closeness":
-        CC = GT.closeness(vertices=None, weights="weight")
+        CC = graph.closeness(vertices=None, weights="weight")
         qt = np.quantile(CC, 1 - prune_quantile)
         sub_nodes = []
-        for c, v in enumerate(GT.vs):
+        for c, v in enumerate(graph.vs):
             if CC[c] >= qt:
                 sub_nodes.append(c)
-            GT.vs[c]["cc"] = CC[c]
-        return GT.induced_subgraph(sub_nodes)
+            graph.vs[c]["cc"] = CC[c]
+        return graph.induced_subgraph(sub_nodes)
 
     if prune_measure == "random":
         # For reproducibility
         random.seed(0)
         # Create a random order for the edges
-        edge_order = random.sample(range(GT.ecount()), k=GT.ecount())
+        edge_order = random.sample(range(graph.ecount()), k=graph.ecount())
         # "lower" and + 1 so smallest quantile has at least one edge
         index = np.quantile(np.arange(len(edge_order)), prune_quantile, method="lower") + 1
-        return GT.subgraph_edges(edge_order[:index])
+        return graph.subgraph_edges(edge_order[:index])
 
     raise ValueError(f"Unknown pruning measure: {prune_measure}")
