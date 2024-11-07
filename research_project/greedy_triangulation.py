@@ -1,6 +1,11 @@
+import copy
+import random
 from typing import Optional
 
 import igraph as ig
+from tqdm.notebook import tqdm
+
+from src.functions import poipairs_by_distance, new_edge_intersects, greedy_triangulation
 
 
 def greedy_triangulation_routing(
@@ -34,55 +39,62 @@ def greedy_triangulation_routing(
     """
     if prune_quantiles is None:
         prune_quantiles = [1]
-    if len(pois) < 2: return ([], [])  # We can't do anything with less than 2 POIs
+    if len(pois) < 2:
+        return [], []  # We can't do anything with less than 2 POIs
 
-    # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
-    pois_indices = set()
+    poi_indices = set()
     for poi in pois:
-        pois_indices.add(graph.vs.find(id=poi).index)
-    G_temp = copy.deepcopy(graph)
-    for e in G_temp.es:  # delete all edges
-        G_temp.es.delete(e)
+        poi_indices.add(graph.vs.find(id=poi).index)
 
-    poipairs = poipairs_by_distance(graph, pois, True)
-    if len(poipairs) == 0: return ([], [])
+    edgeless_graph = copy.deepcopy(graph)
+    for e in edgeless_graph.es:
+        edgeless_graph.es.delete(e)
+
+    poi_pairs = poipairs_by_distance(graph, pois, return_distances=True)
+    if len(poi_pairs) == 0:
+        return [], []
 
     if prune_measure == "random":
-        # run the whole GT first
-        GT = copy.deepcopy(G_temp.subgraph(pois_indices))
-        for poipair, poipair_distance in poipairs:
-            poipair_ind = (GT.vs.find(id=poipair[0]).index, GT.vs.find(id=poipair[1]).index)
+        # Run the whole GT first
+        GT: ig.Graph = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
+        # Add edges between POIs in ascending order of distance
+        for poi_pair, distance in poi_pairs:
+            v = GT.vs.find(id=poi_pair[0]).index
+            w = GT.vs.find(id=poi_pair[1]).index
             if not new_edge_intersects(GT, (
-            GT.vs[poipair_ind[0]]["x"], GT.vs[poipair_ind[0]]["y"], GT.vs[poipair_ind[1]]["x"],
-            GT.vs[poipair_ind[1]]["y"])):
-                GT.add_edge(poipair_ind[0], poipair_ind[1], weight=poipair_distance)
-        # create a random order for the edges
+                GT.vs[v]["x"], GT.vs[w]["y"],
+                GT.vs[v]["x"], GT.vs[w]["y"],
+            )):
+                GT.add_edge(v, w, weight=distance)
+        # Create a random order for the edges
         random.seed(0)  # const seed for reproducibility
-        edgeorder = random.sample(range(GT.ecount()), k=GT.ecount())
+        edge_order = random.sample(range(GT.ecount()), k=GT.ecount())
     else:
-        edgeorder = False
+        edge_order = False
 
+    # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
     GT_abstracts = []
     GTs = []
     for prune_quantile in tqdm(prune_quantiles, desc="Greedy triangulation", leave=False):
-        GT_abstract = copy.deepcopy(G_temp.subgraph(pois_indices))
-        GT_abstract = greedy_triangulation(GT_abstract, poipairs, prune_quantile, prune_measure, edgeorder)
+        GT_abstract = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
+        GT_abstract = greedy_triangulation(GT_abstract, poi_pairs, prune_quantile, prune_measure, edge_order)
         GT_abstracts.append(GT_abstract)
 
         # Get node pairs we need to route, sorted by distance
-        routenodepairs = {}
+        route_node_pairs = {}
         for e in GT_abstract.es:
-            routenodepairs[(e.source_vertex["id"], e.target_vertex["id"])] = e["weight"]
-        routenodepairs = sorted(routenodepairs.items(), key=lambda x: x[1])
+            route_node_pairs[(e.source_vertex["id"], e.target_vertex["id"])] = e["weight"]
+        route_node_pairs = sorted(route_node_pairs.items(), key=lambda x: x[1])
 
         # Do the routing
         GT_indices = set()
-        for poipair, poipair_distance in routenodepairs:
-            poipair_ind = (graph.vs.find(id=poipair[0]).index, graph.vs.find(id=poipair[1]).index)
-            sp = set(graph.get_shortest_paths(poipair_ind[0], poipair_ind[1], weights="weight", output="vpath")[0])
+        for poi_pair, distance in route_node_pairs:
+            v = graph.vs.find(id=poi_pair[0]).index
+            w = graph.vs.find(id=poi_pair[1]).index
+            sp = set(graph.get_shortest_paths(v, w, weights="weight", output="vpath")[0])
             GT_indices = GT_indices.union(sp)
 
         GT = graph.induced_subgraph(GT_indices)
         GTs.append(GT)
 
-    return (GTs, GT_abstracts)
+    return GTs, GT_abstracts
