@@ -1,11 +1,13 @@
 import copy
+import math
 import random
 from typing import Optional
 
 import igraph as ig
+import numpy as np
 from tqdm.notebook import tqdm
 
-from src.functions import poipairs_by_distance, new_edge_intersects, greedy_triangulation
+from src.functions import poipairs_by_distance, new_edge_intersects
 
 
 def greedy_triangulation_routing(
@@ -76,7 +78,7 @@ def greedy_triangulation_routing(
     GT_abstracts = []
     GTs = []
     for prune_quantile in tqdm(prune_quantiles, desc="Greedy triangulation", leave=False):
-        GT_abstract = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
+        GT_abstract = copy.deepcopy(edgeless_graph.subgraph(poi_indices))  # TODO: Pass non-empty graph to GT
         GT_abstract = greedy_triangulation(GT_abstract, poi_pairs, prune_quantile, prune_measure, edge_order)
         GT_abstracts.append(GT_abstract)
 
@@ -98,3 +100,52 @@ def greedy_triangulation_routing(
         GTs.append(GT)
 
     return GTs, GT_abstracts
+
+
+def greedy_triangulation(GT, poipairs, prune_quantile=1, prune_measure="betweenness", edgeorder=False):
+    """Greedy Triangulation (GT) of a graph GT with an empty edge set.
+    Distances between pairs of nodes are given by poipairs.
+
+    The GT connects pairs of nodes in ascending order of their distance provided
+    that no edge crossing is introduced. It leads to a maximal connected planar
+    graph, while minimizing the total length of edges considered.
+    See: cardillo2006spp
+    """
+
+    for poipair, poipair_distance in poipairs:
+        poipair_ind = (GT.vs.find(id=poipair[0]).index, GT.vs.find(id=poipair[1]).index)
+        if not new_edge_intersects(GT, (
+        GT.vs[poipair_ind[0]]["x"], GT.vs[poipair_ind[0]]["y"], GT.vs[poipair_ind[1]]["x"],
+        GT.vs[poipair_ind[1]]["y"])):
+            GT.add_edge(poipair_ind[0], poipair_ind[1], weight=poipair_distance)
+
+    # Get the measure for pruning
+    if prune_measure == "betweenness":
+        BW = GT.edge_betweenness(directed=False, weights="weight")
+        qt = np.quantile(BW, 1 - prune_quantile)
+        sub_edges = []
+        for c, e in enumerate(GT.es):
+            if BW[c] >= qt:
+                sub_edges.append(c)
+            GT.es[c]["bw"] = BW[c]
+            GT.es[c]["width"] = math.sqrt(BW[c] + 1) * 0.5
+        # Prune
+        GT = GT.subgraph_edges(sub_edges)
+    elif prune_measure == "closeness":
+        CC = GT.closeness(vertices=None, weights="weight")
+        qt = np.quantile(CC, 1 - prune_quantile)
+        sub_nodes = []
+        for c, v in enumerate(GT.vs):
+            if CC[c] >= qt:
+                sub_nodes.append(c)
+            GT.vs[c]["cc"] = CC[c]
+        GT = GT.induced_subgraph(sub_nodes)
+    elif prune_measure == "random":
+        ind = np.quantile(
+            np.arange(len(edgeorder)),
+            prune_quantile,
+            interpolation="lower"
+        ) + 1  # "lower" and + 1 so smallest quantile has at least one edge
+        GT = GT.subgraph_edges(edgeorder[:ind])
+
+    return GT
