@@ -112,36 +112,74 @@ def greedy_triangulation(
     return prune(GT, prune_quantile, prune_measure)
 
 
-def prune(graph, prune_quantile, prune_measure):
-    if prune_measure == "betweenness":
-        BW = graph.edge_betweenness(directed=False, weights="weight")
-        qt = np.quantile(BW, 1 - prune_quantile)
-        sub_edges = []
-        for c, e in enumerate(graph.es):
-            if BW[c] >= qt:
-                sub_edges.append(c)
-            graph.es[c]["bw"] = BW[c]
-            graph.es[c]["width"] = math.sqrt(BW[c] + 1) * 0.5
-        # Prune
-        return graph.subgraph_edges(sub_edges)
+def prune_graph(graph: ig.Graph, prune_quantile: float, prune_measure: str) -> ig.Graph:
+    """
+    Prune a graph based on the given measure and quantile.
+    The pruning measure can be one of:
 
-    if prune_measure == "closeness":
-        CC = graph.closeness(vertices=None, weights="weight")
-        qt = np.quantile(CC, 1 - prune_quantile)
-        sub_nodes = []
-        for c, v in enumerate(graph.vs):
-            if CC[c] >= qt:
-                sub_nodes.append(c)
-            graph.vs[c]["cc"] = CC[c]
-        return graph.induced_subgraph(sub_nodes)
+    - 'betweenness': Edge betweenness.
+    - 'closeness': Vertex closeness centrality.
+    - 'random': Random edge pruning.
 
-    if prune_measure == "random":
-        # For reproducibility
-        random.seed(0)
-        # Create a random order for the edges
-        edge_order = random.sample(range(graph.ecount()), k=graph.ecount())
-        # "lower" and + 1 so smallest quantile has at least one edge
-        index = np.quantile(np.arange(len(edge_order)), prune_quantile, method="lower") + 1
-        return graph.subgraph_edges(edge_order[:index])
+    :param graph: The input graph to prune.
+    :param prune_quantile: The quantile value specifying the degree of pruning.
+    :param prune_measure: The measure used for pruning edges in the graph.
+    :return: The pruned graph - a subgraph of the input graph.
+    """
+    prune_measures = {
+        "betweenness": _prune_betweenness,
+        "closeness": _prune_closeness,
+        "random": _prune_random,
+    }
+
+    if prune_measure in prune_measures:
+        return prune_measures[prune_measure](graph, prune_quantile)
 
     raise ValueError(f"Unknown pruning measure: {prune_measure}")
+
+
+def _prune_betweenness(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
+    """
+    Prune a graph based on edge betweenness, keeping only the edges with betweenness above the given quantile.
+    The betweenness of an edge is the number of shortest paths that pass through it.
+    """
+    edge_betweenness = graph.edge_betweenness(directed=False, weights="weight")
+    quantile = np.quantile(edge_betweenness, 1 - prune_quantile)
+    subgraph_edges = []
+
+    for i in range(graph.ecount()):
+        if edge_betweenness[i] >= quantile:
+            subgraph_edges.append(i)
+        graph.es[i]["bw"] = edge_betweenness[i]
+        # For visualization, scale the width of the edge based on its betweenness
+        graph.es[i]["width"] = math.sqrt(edge_betweenness[i] + 1) * 0.5
+
+    return graph.subgraph_edges(subgraph_edges)
+
+
+def _prune_closeness(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
+    """
+    Prune a graph based on closeness centrality, keeping only the vertices with closeness above the given quantile.
+    The closeness of a vertex measures how close it is to all other vertices in the graph.
+    """
+    closeness = graph.closeness(vertices=None, weights="weight")
+    quantile = np.quantile(closeness, 1 - prune_quantile)
+    subgraph_vertices = []
+
+    for i in range(graph.vcount()):
+        if closeness[i] >= quantile:
+            subgraph_vertices.append(i)
+        graph.vs[i]["cc"] = closeness[i]
+
+    return graph.induced_subgraph(subgraph_vertices)
+
+
+def _prune_random(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
+    """Prune a graph randomly, keeping only the edges up to the given quantile."""
+    # For reproducibility
+    random.seed(0)
+    # Create a random order for the edges
+    edge_order = random.sample(range(graph.ecount()), k=graph.ecount())
+    # "lower" and + 1 so smallest quantile has at least one edge
+    index = np.quantile(np.arange(len(edge_order)), prune_quantile, method="lower") + 1
+    return graph.subgraph_edges(edge_order[:index])
