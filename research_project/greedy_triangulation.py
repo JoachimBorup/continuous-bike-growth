@@ -49,25 +49,27 @@ def greedy_triangulation_routing(
         poi_indices.add(graph.vs.find(id=poi).index)
 
     edgeless_graph = copy.deepcopy(graph)
-    for e in edgeless_graph.es:
-        edgeless_graph.es.delete(e)
+    for edge in edgeless_graph.es:
+        edgeless_graph.es.delete(edge)
 
     poi_pairs = poipairs_by_distance(graph, pois, return_distances=True)
     if len(poi_pairs) == 0:
         return [], []
 
     # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
+    GT_abstract = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
+    greedy_triangulation(GT_abstract, poi_pairs)
+
     GT_abstracts = []
     GTs = []
     for prune_quantile in tqdm(prune_quantiles, desc="Greedy triangulation", leave=False):
-        GT_abstract = copy.deepcopy(edgeless_graph.subgraph(poi_indices))  # TODO: Pass non-empty graph to GT
-        GT_abstract = greedy_triangulation(GT_abstract, poi_pairs, prune_quantile, prune_measure)
+        pruned_graph = prune_graph(GT_abstract, prune_quantile, prune_measure)
         GT_abstracts.append(GT_abstract)
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
-        for e in GT_abstract.es:
-            route_node_pairs[(e.source_vertex["id"], e.target_vertex["id"])] = e["weight"]
+        for edge in pruned_graph.es:
+            route_node_pairs[(edge.source_vertex["id"], edge.target_vertex["id"])] = edge["weight"]
         route_node_pairs = sorted(route_node_pairs.items(), key=lambda x: x[1])
 
         # Do the routing
@@ -85,11 +87,9 @@ def greedy_triangulation_routing(
 
 
 def greedy_triangulation(
-    GT: ig.Graph,
+    graph: ig.Graph,
     poi_pairs: list[tuple[tuple[int, int], float]],
-    prune_quantile: float = 1,
-    prune_measure="betweenness",
-) -> ig.Graph:
+) -> None:
     """Greedy Triangulation (GT) of a graph GT with an empty edge set.
     Distances between pairs of nodes are given by poi_pairs.
 
@@ -101,15 +101,13 @@ def greedy_triangulation(
 
     # Add edges between POIs in ascending order of distance
     for poi_pair, distance in poi_pairs:
-        v = GT.vs.find(id=poi_pair[0]).index
-        w = GT.vs.find(id=poi_pair[1]).index
-        if not new_edge_intersects(GT, (
-            GT.vs[v]["x"], GT.vs[v]["y"],
-            GT.vs[w]["x"], GT.vs[w]["y"]
+        v = graph.vs.find(id=poi_pair[0]).index
+        w = graph.vs.find(id=poi_pair[1]).index
+        if not new_edge_intersects(graph, (
+            graph.vs[v]["x"], graph.vs[v]["y"],
+            graph.vs[w]["x"], graph.vs[w]["y"]
         )):
-            GT.add_edge(v, w, weight=distance)
-
-    return prune(GT, prune_quantile, prune_measure)
+            graph.add_edge(v, w, weight=distance)
 
 
 def prune_graph(graph: ig.Graph, prune_quantile: float, prune_measure: str) -> ig.Graph:
