@@ -2,4 +2,4 @@
 **/.ipynb_checkpoints/**
 data/
 plots/
-code/
+/src/cache/
