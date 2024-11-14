@@ -1,13 +1,14 @@
-import copy
-import math
+# import copy
+# import math
+# import random
+# from typing import Optional
+#
+# import igraph as ig
+# import numpy as np
+# from tqdm.notebook import tqdm
+#
+# from src.functions import poipairs_by_distance, new_edge_intersects
 import random
-from typing import Optional
-
-import igraph as ig
-import numpy as np
-from tqdm.notebook import tqdm
-
-from src.functions import poipairs_by_distance, new_edge_intersects
 
 
 def greedy_triangulation_in_steps(
@@ -24,11 +25,13 @@ def greedy_triangulation_in_steps(
     if len(pois) < 2:
         return [], []
     poi_pairs = poipairs_by_distance(graph, pois, return_distances=True)
+    poi_indices = {graph.vs.find(id=poi).index for poi in pois}
     if len(poi_pairs) == 0:
         return [], []
 
+    random.seed(0)
     subgraph_pois = random.sample(pois, int(len(pois) * subgraph_percentage))
-    subgraph_poi_indices = {graph.vs.find(id=poi).index for poi in subgraph_pois}
+    # subgraph_poi_indices = {graph.vs.find(id=poi).index for poi in subgraph_pois}
     subgraph_poi_pairs = poipairs_by_distance(graph, subgraph_pois, return_distances=True)
 
     edgeless_graph = copy.deepcopy(graph)
@@ -38,17 +41,44 @@ def greedy_triangulation_in_steps(
     GTs, GT_abstracts = [], []
     for prune_quantile in tqdm(prune_quantiles, desc=f"Greedy triangulation on {subgraph_percentage * 100}% subgraph", leave=False):
         # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
-        GT_abstract = copy.deepcopy(edgeless_graph.subgraph(subgraph_poi_indices))
-        greedy_triangulation(GT_abstract, subgraph_poi_pairs)
+        GT_abstract = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
+
+        offender = 4483790348
+        print(f'Vertex in GT_abstract: {offender in GT_abstract.vs["id"]}')
+
+        _greedy_triangulation(GT_abstract, subgraph_poi_pairs)
+
+        print(f'Vertex in GT_abstract after GT: {offender in GT_abstract.vs["id"]}')
+
+        print('All POI IDs:', sorted(pois))
+        # print('Subgraph POI IDs:', sorted(subgraph_pois))
+        # print('Vertex IDs:', sorted([v['id'] for v in GT_abstract.vs]))
+
         pruned_graph = prune_graph(GT_abstract, prune_quantile, prune_measure)
 
+        print(f'Vertex in pruned_graph: {offender in pruned_graph.vs["id"]}')
+
+
         # Add the rest of the vertices to the GT graph and run greedy triangulation again
-        greedy_triangulation(pruned_graph, poi_pairs)
+        _greedy_triangulation(pruned_graph, poi_pairs)
+
+        print(f'Vertex in pruned_graph after GT: {offender in pruned_graph.vs["id"]}')
+
         pruned_graph = prune_graph(GT_abstract, prune_quantile, prune_measure)
+
+        print(f'Vertex in pruned_graph after pruning: {offender in pruned_graph.vs["id"]}')
+
+        limit = 10
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
         for edge in pruned_graph.es:
+            if limit > 0:
+                print(f'Edge: {edge.source_vertex["id"]} -> {edge.target_vertex["id"]}')
+                limit -= 1
+            if edge.source_vertex["id"] == offender or edge.target_vertex["id"] == offender:
+                print(f'Offender in edge: {edge.source_vertex["id"]} -> {edge.target_vertex["id"]}')
+
             route_node_pairs[(edge.source_vertex["id"], edge.target_vertex["id"])] = edge["weight"]
         route_node_pairs = sorted(route_node_pairs.items(), key=lambda x: x[1])
 
@@ -57,16 +87,29 @@ def greedy_triangulation_in_steps(
         for poi_pair, _ in route_node_pairs:
             v = graph.vs.find(id=poi_pair[0]).index
             w = graph.vs.find(id=poi_pair[1]).index
-            sp = set(graph.get_shortest_paths(v, w, weights="weight", output="vpath")[0])
+
+            if poi_pair[0] == offender or poi_pair[1] == offender:
+                print(f'Computing shortest path between pair: {poi_pair}')
+
+            sp = set(graph.get_shortest_path(v, w, weights="weight", output="vpath"))
+
+            if offender in sp or ((poi_pair[0] == offender or poi_pair[1] == offender) and (v in sp or w in sp)):
+                print(f'Offender in shortest path between pair: {poi_pair}')
+
             GT_indices = GT_indices.union(sp)
 
+        print(f'Vertex in GT_indices: {offender in GT_indices}')
+
         GT = graph.induced_subgraph(GT_indices)
+
+        print(f'Vertex in GT: {offender in GT.vs["id"]}')
+
         GTs.append(GT)
 
     return GTs, GT_abstracts
 
 
-def greedy_triangulation_routing(
+def _greedy_triangulation_routing(
     graph: ig.Graph,
     pois: list[int],
     prune_quantiles: Optional[list[float]] = None,
@@ -117,7 +160,7 @@ def greedy_triangulation_routing(
     for prune_quantile in tqdm(prune_quantiles, desc="Greedy triangulation", leave=False):
         # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
         GT_abstract = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
-        greedy_triangulation(GT_abstract, poi_pairs)
+        _greedy_triangulation(GT_abstract, poi_pairs)
         pruned_graph = prune_graph(GT_abstract, prune_quantile, prune_measure)
         GT_abstracts.append(GT_abstract)
 
@@ -141,7 +184,7 @@ def greedy_triangulation_routing(
     return GTs, GT_abstracts
 
 
-def greedy_triangulation(
+def _greedy_triangulation(
     graph: ig.Graph,
     poi_pairs: list[tuple[tuple[int, int], float]],
 ) -> None:
@@ -156,6 +199,7 @@ def greedy_triangulation(
 
     # Add edges between POIs in ascending order of distance
     for poi_pair, distance in poi_pairs:
+        # print(f'Pairing {poi_pair}')
         v = graph.vs.find(id=poi_pair[0]).index
         w = graph.vs.find(id=poi_pair[1]).index
         if not new_edge_intersects(graph, (
@@ -200,6 +244,8 @@ def _prune_betweenness(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
     quantile = np.quantile(edge_betweenness, 1 - prune_quantile)
     subgraph_edges = []
 
+    print('Pruning betweenness...')
+
     for i in range(graph.ecount()):
         if edge_betweenness[i] >= quantile:
             subgraph_edges.append(i)
@@ -207,7 +253,8 @@ def _prune_betweenness(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
         # For visualization, scale the width of the edge based on its betweenness
         graph.es[i]["width"] = math.sqrt(edge_betweenness[i] + 1) * 0.5
 
-    return graph.subgraph_edges(subgraph_edges)
+    print('Finished pruning betweenness')
+    return graph.subgraph_edges(subgraph_edges, delete_vertices=False)
 
 
 def _prune_closeness(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
@@ -224,6 +271,7 @@ def _prune_closeness(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
             subgraph_vertices.append(i)
         graph.vs[i]["cc"] = closeness[i]
 
+    # TODO: Check whether vertices are deleted
     return graph.induced_subgraph(subgraph_vertices)
 
 
@@ -235,4 +283,4 @@ def _prune_random(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
     edge_order = random.sample(range(graph.ecount()), k=graph.ecount())
     # "lower" and + 1 so smallest quantile has at least one edge
     index = np.quantile(np.arange(len(edge_order)), prune_quantile, method="lower") + 1
-    return graph.subgraph_edges(edge_order[:index])
+    return graph.subgraph_edges(edge_order[:index], delete_vertices=False)
