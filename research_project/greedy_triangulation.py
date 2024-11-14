@@ -16,7 +16,7 @@ def greedy_triangulation_in_steps(
     subgraph_percentage: float,
     prune_quantiles: Optional[list[float]] = None,
     prune_measure: str = "betweenness",
-) -> tuple[list[tuple[ig.Graph, ig.Graph]], list[tuple[ig.Graph, ig.Graph]]]:
+) -> tuple[list[ig.Graph], list[ig.Graph]]:
     if 1 < subgraph_percentage < 0:
         raise ValueError("Subgraph percentage must be between 0 and 1")
     if prune_quantiles is None:
@@ -35,40 +35,16 @@ def greedy_triangulation_in_steps(
     for edge in edgeless_graph.es:
         edgeless_graph.es.delete(edge)
 
-    # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
-    GT_abstract = copy.deepcopy(edgeless_graph.subgraph(subgraph_poi_indices))
-    greedy_triangulation(GT_abstract, subgraph_poi_pairs)
-
-    subgraph_GTs, subgraph_GT_abstracts = [], []
-    for prune_quantile in tqdm(prune_quantiles, desc=f"Greedy triangulation on {subgraph_percentage * 100}% subgraph", leave=False):
-        pruned_graph = prune_graph(GT_abstract, prune_quantile, prune_measure)
-        # TODO: Same reference for all subgraphs. Copy each time instead
-        subgraph_GT_abstracts.append(GT_abstract)
-
-        # Get node pairs we need to route, sorted by distance
-        route_node_pairs = {}
-        for edge in pruned_graph.es:
-            route_node_pairs[(edge.source_vertex["id"], edge.target_vertex["id"])] = edge["weight"]
-        route_node_pairs = sorted(route_node_pairs.items(), key=lambda x: x[1])
-
-        # Do the routing
-        GT_indices = set()
-        for poi_pair, _ in route_node_pairs:
-            v = graph.vs.find(id=poi_pair[0]).index
-            w = graph.vs.find(id=poi_pair[1]).index
-            sp = set(graph.get_shortest_paths(v, w, weights="weight", output="vpath")[0])
-            GT_indices = GT_indices.union(sp)
-
-        GT = graph.induced_subgraph(GT_indices)
-        subgraph_GTs.append(GT)
-
-    # Add the rest of the vertices to the GT graph and run greedy triangulation again
-    greedy_triangulation(GT_abstract, poi_pairs)
-
     GTs, GT_abstracts = [], []
-    for prune_quantile in tqdm(prune_quantiles, desc=f"Greedy triangulation on full graph", leave=False):
+    for prune_quantile in tqdm(prune_quantiles, desc=f"Greedy triangulation on {subgraph_percentage * 100}% subgraph", leave=False):
+        # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
+        GT_abstract = copy.deepcopy(edgeless_graph.subgraph(subgraph_poi_indices))
+        greedy_triangulation(GT_abstract, subgraph_poi_pairs)
         pruned_graph = prune_graph(GT_abstract, prune_quantile, prune_measure)
-        GT_abstracts.append(GT_abstract)
+
+        # Add the rest of the vertices to the GT graph and run greedy triangulation again
+        greedy_triangulation(pruned_graph, poi_pairs)
+        pruned_graph = prune_graph(GT_abstract, prune_quantile, prune_measure)
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
@@ -87,7 +63,7 @@ def greedy_triangulation_in_steps(
         GT = graph.induced_subgraph(GT_indices)
         GTs.append(GT)
 
-    return list(zip(subgraph_GTs, GTs)), list(zip(subgraph_GT_abstracts, GT_abstracts))
+    return GTs, GT_abstracts
 
 
 def greedy_triangulation_routing(
@@ -136,13 +112,12 @@ def greedy_triangulation_routing(
     if len(poi_pairs) == 0:
         return [], []
 
-    # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
-    GT_abstract = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
-    greedy_triangulation(GT_abstract, poi_pairs)
-
     GT_abstracts = []
     GTs = []
     for prune_quantile in tqdm(prune_quantiles, desc="Greedy triangulation", leave=False):
+        # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
+        GT_abstract = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
+        greedy_triangulation(GT_abstract, poi_pairs)
         pruned_graph = prune_graph(GT_abstract, prune_quantile, prune_measure)
         GT_abstracts.append(GT_abstract)
 
