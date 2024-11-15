@@ -77,22 +77,18 @@ def sum_of_errors_pois(graph1, graph2, pois) -> tuple[int, int, int]:
     g1_disconnected_points = 0
     g2_disconnected_points = 0
 
-    print(f'Graph 1 contains 4483790348: {4483790348 in graph1.vs["id"]}')
-    print(f'Graph 2 contains 4483790348: {4483790348 in graph2.vs["id"]}')
-
+    expected_iterations = len(pois) * (len(pois) - 1) / 2
     iterations = 0
-    print(f'Expecting {len(pois)*(len(pois)-1)/2} iterations')
 
     for v in pois:  # IDs, not indices
         for w in pois:
             if (v==w or v>w):
                 continue
 
-            if iterations % 100 == 0:
-                print(f'Iteration {iterations}')
+            if iterations % 250 == 0:
+                print(f'Iteration {iterations}/{expected_iterations}')
             iterations += 1
 
-            print(f'v: {v}, w: {w}')
             shortest_path_g1_length = graph1.distances(graph1.vs.find(id=v).index, graph1.vs.find(id=w).index, weights='weight')
             #print(f"Shortest path length in g1 (total Euclidean distance): {shortest_path_g1_length[0]}")
             shortest_path_g2_length = graph2.distances(graph2.vs.find(id=v).index, graph2.vs.find(id=w).index, weights='weight')
@@ -149,8 +145,3 @@ def example() :
 
     error_for_pois, g1_disconnected_pois, g2_disconnected_pois = sum_of_errors_pois(g1, g2, [1,2,7,8,9,10])
     print(f"The error is: {error_for_pois} and there are {g1_disconnected_pois} pairs of points in g1 and {g2_disconnected_pois} pairs of points in g2 that can't reach each other when graph2 is compared to graph1 for the points of interest, O(pois^2)")
-
-#
-# if __name__ == "__main__":
-#     #Run the example to check if the methods work
-#     example()
