@@ -1,12 +1,12 @@
-# import copy
-# import math
-# import random
-# from typing import Optional
-#
-# import igraph as ig
-# import numpy as np
-# from tqdm.notebook import tqdm
-#
+import copy
+import math
+import random
+from typing import Optional
+
+import igraph as ig
+import numpy as np
+from tqdm.notebook import tqdm
+
 # from src.functions import poipairs_by_distance, new_edge_intersects
 
 
@@ -28,7 +28,6 @@ def greedy_triangulation_in_steps(
     if len(poi_pairs) == 0:
         return [], []
 
-    random.seed(0)
     subgraph_pois = random.sample(pois, int(len(pois) * subgraph_percentage))
     # subgraph_poi_indices = {graph.vs.find(id=poi).index for poi in subgraph_pois}
     subgraph_poi_pairs = poipairs_by_distance(graph, subgraph_pois, return_distances=True)
@@ -233,8 +232,6 @@ def _prune_closeness(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
 
 def _prune_random(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
     """Prune a graph randomly, keeping only the edges up to the given quantile."""
-    # For reproducibility
-    random.seed(0)
     # Create a random order for the edges
     edge_order = random.sample(range(graph.ecount()), k=graph.ecount())
     # "lower" and + 1 so smallest quantile has at least one edge
