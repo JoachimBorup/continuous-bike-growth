@@ -1,41 +1,42 @@
-#First attempt at graph similarity
 import igraph as ig
 import math
 import random
 
-#we calculate the shortest path between all vertices in g1 and g2. The error is the sum of errors for g2 compared to g1. 
+
+#we calculate the shortest path between all vertices in g1 and g2. The error is the sum of errors for g2 compared to g1.
 def sum_of_errors(graph1, graph2) -> tuple[int, int, int]:
     error = 0
     g1_disconnected_points = 0
     g2_disconnected_points = 0
 
     num_vertices = graph1.vcount()
-    if num_vertices != graph2.vcount() :
+    if num_vertices != graph2.vcount():
         raise Exception("The two graphs do not have the same number of vertices")
-    for i in range (0, num_vertices):
-        for j in range (0, num_vertices):
-            if (i==j or i>j) :
+    for i in range(0, num_vertices):
+        for j in range(0, num_vertices):
+            if i == j or i > j:
                 continue
-            else :
+            else:
                 shortest_path_g1_length = graph1.distances(i, j, weights='weight')
                 shortest_path_g2_length = graph2.distances(i, j, weights='weight')
 
-                if(math.isinf(shortest_path_g1_length[0][0]) and math.isinf(shortest_path_g2_length[0][0])) :
+                if math.isinf(shortest_path_g1_length[0][0]) and math.isinf(shortest_path_g2_length[0][0]):
                     g1_disconnected_points = g1_disconnected_points + 1
                     g2_disconnected_points = g2_disconnected_points + 1
-                elif(math.isinf(shortest_path_g1_length[0][0])) :
+                elif math.isinf(shortest_path_g1_length[0][0]):
                     g1_disconnected_points = g1_disconnected_points + 1
-                elif(math.isinf(shortest_path_g2_length[0][0])) :
+                elif math.isinf(shortest_path_g2_length[0][0]):
                     g2_disconnected_points = g2_disconnected_points + 1
-                else :    
-                    diff = shortest_path_g2_length[0][0]-shortest_path_g1_length[0][0]
-                    error = error+diff
+                else:
+                    diff = shortest_path_g2_length[0][0] - shortest_path_g1_length[0][0]
+                    error = error + diff
     return error, g1_disconnected_points, g2_disconnected_points
+
 
 def generate_unique_vertex_pairs(number_of_pairs) -> list:
     unique_tuples = set()
     while len(unique_tuples) < number_of_pairs:
-        unique_tuples.add((random.randint(0, number_of_pairs-1), random.randint(0, number_of_pairs-1)))
+        unique_tuples.add((random.randint(0, number_of_pairs - 1), random.randint(0, number_of_pairs - 1)))
     return list(unique_tuples)
 
 
@@ -46,72 +47,67 @@ def sum_of_errors_part_of_graph(graph1, graph2, percent) -> tuple[int, int, int]
     g2_disconnected_points = 0
 
     num_vertices = graph1.vcount()
-    if num_vertices != graph2.vcount() :
+    if num_vertices != graph2.vcount():
         raise Exception("The two graphs do not have the same number of vertices")
-    
+
     number_of_pairs = int(num_vertices * percent)
     random_vertices_from_to = generate_unique_vertex_pairs(number_of_pairs)
 
-    for i,j in random_vertices_from_to:
-        if i==j :
+    for i, j in random_vertices_from_to:
+        if i == j:
             continue
-        else :
+        else:
             shortest_path_g1_length = graph1.distances(i, j, weights='weight')
             shortest_path_g2_length = graph2.distances(i, j, weights='weight')
 
-            if(math.isinf(shortest_path_g1_length[0][0]) and math.isinf(shortest_path_g2_length[0][0])) :
+            if math.isinf(shortest_path_g1_length[0][0]) and math.isinf(shortest_path_g2_length[0][0]):
                 g1_disconnected_points = g1_disconnected_points + 1
                 g2_disconnected_points = g2_disconnected_points + 1
-            elif(math.isinf(shortest_path_g1_length[0][0])) :
+            elif math.isinf(shortest_path_g1_length[0][0]):
                 g1_disconnected_points = g1_disconnected_points + 1
-            elif(math.isinf(shortest_path_g2_length[0][0])) :
+            elif math.isinf(shortest_path_g2_length[0][0]):
                 g2_disconnected_points = g2_disconnected_points + 1
-            else :    
-                diff = shortest_path_g2_length[0][0]-shortest_path_g1_length[0][0]
-                error = error+diff
+            else:
+                diff = shortest_path_g2_length[0][0] - shortest_path_g1_length[0][0]
+                error = error + diff
     return error, g1_disconnected_points, g2_disconnected_points
 
-#Calculate the shortest path from all points of interest to all points of interest 
+
+#Calculate the shortest path from all points of interest to all points of interest
 def sum_of_errors_pois(graph1, graph2, pois) -> tuple[int, int, int]:
     error = 0
     g1_disconnected_points = 0
     g2_disconnected_points = 0
 
-    expected_iterations = len(pois) * (len(pois) - 1) / 2
-    iterations = 0
-
     for v in pois:  # IDs, not indices
         for w in pois:
-            if (v==w or v>w):
+            if v == w or v > w:
                 continue
 
-            if iterations % 250 == 0:
-                print(f'Iteration {iterations}/{expected_iterations}')
-            iterations += 1
-
             shortest_path_g1_length = graph1.distances(graph1.vs.find(id=v).index, graph1.vs.find(id=w).index, weights='weight')
-            #print(f"Shortest path length in g1 (total Euclidean distance): {shortest_path_g1_length[0]}")
             shortest_path_g2_length = graph2.distances(graph2.vs.find(id=v).index, graph2.vs.find(id=w).index, weights='weight')
-            #print(f"Shortest path length in g2 (total Euclidean distance): {shortest_path_g2_length[0]}")
-            if(math.isinf(shortest_path_g1_length[0][0]) and math.isinf(shortest_path_g2_length[0][0])) :
+
+            if math.isinf(shortest_path_g1_length[0][0]) and math.isinf(shortest_path_g2_length[0][0]):
                 g1_disconnected_points = g1_disconnected_points + 1
                 g2_disconnected_points = g2_disconnected_points + 1
-            elif(math.isinf(shortest_path_g1_length[0][0])) :
+            elif math.isinf(shortest_path_g1_length[0][0]):
                 g1_disconnected_points = g1_disconnected_points + 1
-            elif(math.isinf(shortest_path_g2_length[0][0])) :
+            elif math.isinf(shortest_path_g2_length[0][0]):
                 g2_disconnected_points = g2_disconnected_points + 1
-            else :
-                diff = shortest_path_g2_length[0][0]-shortest_path_g1_length[0][0]
-                error = error+diff
+            else:
+                diff = shortest_path_g2_length[0][0] - shortest_path_g1_length[0][0]
+                error = error + diff
     return error, g1_disconnected_points, g2_disconnected_points
+
 
 #Compute Euclidean distance between two vertices
 def euclidean_distance(v1, v2, graph):
     x1, y1 = graph.vs[v1]['coord']
     x2, y2 = graph.vs[v2]['coord']
-    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+    return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
-def example() :
+
+def example():
     #10 random coordinates in the range 0-9
     coordinates = [(0,1),(0,0),(4,9),(3,6),(9,9),(4,4),(5,3),(8,2),(2,7),(0,6),(0,7)]
 
