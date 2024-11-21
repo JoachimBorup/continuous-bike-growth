@@ -73,13 +73,21 @@ def sum_of_errors_part_of_graph(graph1, graph2, percent) -> tuple[int, int, int]
     return error, g1_disconnected_points, g2_disconnected_points
 
 
-#Calculate the shortest path from all points of interest to all points of interest
-def sum_of_errors_pois(graph1, graph2, pois) -> tuple[int, int, int]:
-    error = 0
-    g1_disconnected_points = 0
-    g2_disconnected_points = 0
+def sum_of_errors_pois(graph1: ig.Graph, graph2: ig.Graph, pois: list[int]) -> tuple[int, int, int]:
+    """
+    Calculate the error between two graphs for all pairs of POIs (points of interest).
+    The error is the sum of the differences in the shortest path lengths between the two graphs for all pairs of POIs.
 
-    for v in pois:  # IDs, not indices
+    :param graph1: The first graph.
+    :param graph2: The second graph.
+    :param pois: The IDs of the POIs.
+    :return: The error, the number pairs of POIs without a path between them in the first graph, and the second graph.
+    """
+    error = 0
+    g1_disconnected_pairs = 0
+    g2_disconnected_pairs = 0
+
+    for v in pois:
         for w in pois:
             if v == w or v > w:
                 continue
@@ -88,16 +96,17 @@ def sum_of_errors_pois(graph1, graph2, pois) -> tuple[int, int, int]:
             shortest_path_g2_length = graph2.distances(graph2.vs.find(id=v).index, graph2.vs.find(id=w).index, weights='weight')
 
             if math.isinf(shortest_path_g1_length[0][0]) and math.isinf(shortest_path_g2_length[0][0]):
-                g1_disconnected_points = g1_disconnected_points + 1
-                g2_disconnected_points = g2_disconnected_points + 1
+                g1_disconnected_pairs += 1
+                g2_disconnected_pairs += 1
             elif math.isinf(shortest_path_g1_length[0][0]):
-                g1_disconnected_points = g1_disconnected_points + 1
+                g1_disconnected_pairs += 1
             elif math.isinf(shortest_path_g2_length[0][0]):
-                g2_disconnected_points = g2_disconnected_points + 1
+                g2_disconnected_pairs += 1
             else:
                 diff = shortest_path_g2_length[0][0] - shortest_path_g1_length[0][0]
                 error = error + diff
-    return error, g1_disconnected_points, g2_disconnected_points
+
+    return error, g1_disconnected_pairs, g2_disconnected_pairs
 
 
 #Compute Euclidean distance between two vertices
