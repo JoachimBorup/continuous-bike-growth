@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Load the dataset
-data = pd.read_csv('montreal_betweenness.csv') 
+data = pd.read_csv('data/montreal_betweenness.csv') 
 
 # Define bins for sum_of_errors
 bins = 20  # Number of bins
