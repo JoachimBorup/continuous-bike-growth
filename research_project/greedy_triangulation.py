@@ -38,7 +38,6 @@ def greedy_triangulation_in_steps(
 
     GTs, GT_abstracts = [], []
     for prune_quantile in tqdm(prune_quantiles, desc=f"Greedy triangulation on {subgraph_percentage * 100}% subgraph", leave=False):
-        # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
         GT_abstract = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
 
         _greedy_triangulation(GT_abstract, subgraph_poi_pairs)
@@ -46,7 +45,9 @@ def greedy_triangulation_in_steps(
 
         # Add the rest of the vertices to the GT graph and run greedy triangulation again
         _greedy_triangulation(pruned_graph, poi_pairs)
-        pruned_graph = prune_graph(GT_abstract, prune_quantile, prune_measure)
+        # TODO: We should only prune edges added in the last greedy triangulation
+        pruned_graph = prune_graph(pruned_graph, prune_quantile, prune_measure)
+        GT_abstracts.append(pruned_graph)
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
