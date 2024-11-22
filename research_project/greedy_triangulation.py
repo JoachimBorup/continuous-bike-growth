@@ -38,12 +38,10 @@ def greedy_triangulation_in_steps(
     gts, abstract_gts = [], []
     for prune_quantile in tqdm(
         prune_quantiles, desc=f"Greedy triangulation on {subgraph_percentage * 100}% subgraph", leave=False
-    ):
-        
+    ):   
         pois_added = []
         pois_not_added = pois
         abstract_gt = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
-        pruned_graph = abstract_gt
         gt_edges = None
         for percentage in subgraph_percentages:
             subgraph_pois = random.sample(pois_not_added, int(len(pois) * percentage))
@@ -52,12 +50,12 @@ def greedy_triangulation_in_steps(
             # subgraph_poi_indices = {graph.vs.find(id=poi).index for poi in subgraph_pois}
             subgraph_poi_pairs = poipairs_by_distance(graph, pois_added, return_distances=True)
 
-            gt_edges = gt_edges + _greedy_triangulation(pruned_graph, subgraph_poi_pairs, gt_edges)
-            pruned_graph = prune_graph(pruned_graph, prune_quantile, prune_measure)
+            gt_edges = gt_edges + _greedy_triangulation(abstract_gt, subgraph_poi_pairs, gt_edges)
+            abstract_gt = prune_graph(abstract_gt, prune_quantile, prune_measure)
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
-        for edge in pruned_graph.es:
+        for edge in abstract_gt.es:
             route_node_pairs[(edge.source_vertex["id"], edge.target_vertex["id"])] = edge["weight"]
         route_node_pairs = sorted(route_node_pairs.items(), key=lambda x: x[1])
 
@@ -69,7 +67,7 @@ def greedy_triangulation_in_steps(
             sp = set(graph.get_shortest_path(v, w, weights="weight", output="vpath"))
             gt_indices = gt_indices.union(sp)
 
-        abstract_gts.append(pruned_graph)
+        abstract_gts.append(abstract_gt)
         gts.append(graph.induced_subgraph(gt_indices.union(poi_indices)))
 
     return gts, abstract_gts
