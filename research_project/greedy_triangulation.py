@@ -7,7 +7,7 @@ import igraph as ig
 import numpy as np
 from tqdm.notebook import tqdm
 
-# from src.functions import poipairs_by_distance, new_edge_intersects
+from src.functions import poipairs_by_distance, new_edge_intersects
 
 
 def greedy_triangulation_in_steps(
@@ -36,18 +36,18 @@ def greedy_triangulation_in_steps(
     for edge in edgeless_graph.es:
         edgeless_graph.es.delete(edge)
 
-    GTs, GT_abstracts = [], []
-    for prune_quantile in tqdm(prune_quantiles, desc=f"Greedy triangulation on {subgraph_percentage * 100}% subgraph", leave=False):
-        GT_abstract = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
+    gts, abstract_gts = [], []
+    for prune_quantile in tqdm(
+        prune_quantiles, desc=f"Greedy triangulation on {subgraph_percentage * 100}% subgraph", leave=False
+    ):
+        abstract_gt = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
 
-        _greedy_triangulation(GT_abstract, subgraph_poi_pairs)
-        pruned_graph = prune_graph(GT_abstract, prune_quantile, prune_measure)
+        _greedy_triangulation(abstract_gt, subgraph_poi_pairs)
+        pruned_graph = prune_graph(abstract_gt, prune_quantile, prune_measure)
 
         # Add the rest of the vertices to the GT graph and run greedy triangulation again
-        _greedy_triangulation(pruned_graph, poi_pairs)
-        # TODO: We should only prune edges added in the last greedy triangulation
-        pruned_graph = prune_graph(pruned_graph, prune_quantile, prune_measure)
-        GT_abstracts.append(pruned_graph)
+        gt_edges = _greedy_triangulation(pruned_graph, poi_pairs)
+        pruned_graph = prune_graph(pruned_graph, prune_quantile, prune_measure, gt_edges)
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
@@ -56,17 +56,17 @@ def greedy_triangulation_in_steps(
         route_node_pairs = sorted(route_node_pairs.items(), key=lambda x: x[1])
 
         # Do the routing
-        GT_indices = set()
+        gt_indices = set()
         for poi_pair, _ in route_node_pairs:
             v = graph.vs.find(id=poi_pair[0]).index
             w = graph.vs.find(id=poi_pair[1]).index
             sp = set(graph.get_shortest_path(v, w, weights="weight", output="vpath"))
-            GT_indices = GT_indices.union(sp)
+            gt_indices = gt_indices.union(sp)
 
-        GT = graph.induced_subgraph(GT_indices.union(poi_indices))
-        GTs.append(GT)
+        abstract_gts.append(pruned_graph)
+        gts.append(graph.induced_subgraph(gt_indices.union(poi_indices)))
 
-    return GTs, GT_abstracts
+    return gts, abstract_gts
 
 
 def _greedy_triangulation_routing(
@@ -115,14 +115,13 @@ def _greedy_triangulation_routing(
     if len(poi_pairs) == 0:
         return [], []
 
-    GT_abstracts = []
-    GTs = []
+    abstract_gts = []
+    gts = []
     for prune_quantile in tqdm(prune_quantiles, desc="Greedy triangulation", leave=False):
-        # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
-        GT_abstract = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
-        _greedy_triangulation(GT_abstract, poi_pairs)
-        pruned_graph = prune_graph(GT_abstract, prune_quantile, prune_measure)
-        GT_abstracts.append(GT_abstract)
+        abstract_gt = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
+
+        _greedy_triangulation(abstract_gt, poi_pairs)
+        pruned_graph = prune_graph(abstract_gt, prune_quantile, prune_measure)
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
@@ -131,23 +130,20 @@ def _greedy_triangulation_routing(
         route_node_pairs = sorted(route_node_pairs.items(), key=lambda x: x[1])
 
         # Do the routing
-        GT_indices = set()
+        gt_indices = set()
         for poi_pair, distance in route_node_pairs:
             v = graph.vs.find(id=poi_pair[0]).index
             w = graph.vs.find(id=poi_pair[1]).index
             sp = set(graph.get_shortest_paths(v, w, weights="weight", output="vpath")[0])
-            GT_indices = GT_indices.union(sp)
+            gt_indices = gt_indices.union(sp)
 
-        GT = graph.induced_subgraph(GT_indices.union(poi_indices))
-        GTs.append(GT)
+        abstract_gts.append(pruned_graph)
+        gts.append(graph.induced_subgraph(gt_indices.union(poi_indices)))
 
-    return GTs, GT_abstracts
+    return gts, abstract_gts
 
 
-def _greedy_triangulation(
-    graph: ig.Graph,
-    poi_pairs: list[tuple[tuple[int, int], float]],
-) -> None:
+def _greedy_triangulation(graph: ig.Graph, poi_pairs: list[tuple[tuple[int, int], float]]) -> set[int]:
     """Greedy Triangulation (GT) of a graph GT with an empty edge set.
     Distances between pairs of nodes are given by poi_pairs.
 
@@ -156,6 +152,7 @@ def _greedy_triangulation(
     graph, while minimizing the total length of edges considered.
     See: cardillo2006spp
     """
+    edges_added = set()
 
     # Add edges between POIs in ascending order of distance
     for poi_pair, distance in poi_pairs:
@@ -165,10 +162,17 @@ def _greedy_triangulation(
             graph.vs[v]["x"], graph.vs[v]["y"],
             graph.vs[w]["x"], graph.vs[w]["y"]
         )):
-            graph.add_edge(v, w, weight=distance)
+            edges_added.add(graph.add_edge(v, w, weight=distance).index)
+
+    return edges_added
 
 
-def prune_graph(graph: ig.Graph, prune_quantile: float, prune_measure: str) -> ig.Graph:
+def prune_graph(
+    graph: ig.Graph,
+    prune_quantile: float,
+    prune_measure: str,
+    gt_edges: Optional[set[int]] = None,
+) -> ig.Graph:
     """
     Prune a graph based on the given measure and quantile.
     The pruning measure can be one of:
@@ -180,6 +184,7 @@ def prune_graph(graph: ig.Graph, prune_quantile: float, prune_measure: str) -> i
     :param graph: The input graph to prune.
     :param prune_quantile: The quantile value specifying the degree of pruning.
     :param prune_measure: The measure used for pruning edges in the graph.
+    :param gt_edges: The indices of the edges added during the last greedy triangulation. Defaults to all edges.
     :return: The pruned graph - a subgraph of the input graph.
     """
     prune_measures = {
@@ -188,23 +193,27 @@ def prune_graph(graph: ig.Graph, prune_quantile: float, prune_measure: str) -> i
         "random": _prune_random,
     }
 
+    if not gt_edges:
+        gt_edges = set(range(graph.ecount()))
+
     if prune_measure in prune_measures:
-        return prune_measures[prune_measure](graph, prune_quantile)
+        return prune_measures[prune_measure](graph, prune_quantile, gt_edges)
 
     raise ValueError(f"Unknown pruning measure: {prune_measure}")
 
 
-def _prune_betweenness(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
+def _prune_betweenness(graph: ig.Graph, prune_quantile: float, gt_edges: set[int]) -> ig.Graph:
     """
     Prune a graph based on edge betweenness, keeping only the edges with betweenness above the given quantile.
     The betweenness of an edge is the number of shortest paths that pass through it.
     """
     edge_betweenness = graph.edge_betweenness(directed=False, weights="weight")
-    quantile = np.quantile(edge_betweenness, 1 - prune_quantile)
+    # Consider only the edges added during the last greedy triangulation
+    quantile = np.quantile([edge_betweenness[i] for i in gt_edges], 1 - prune_quantile)
     subgraph_edges = []
 
     for i in range(graph.ecount()):
-        if edge_betweenness[i] >= quantile:
+        if i in gt_edges and edge_betweenness[i] >= quantile:
             subgraph_edges.append(i)
         graph.es[i]["bw"] = edge_betweenness[i]
         # For visualization, scale the width of the edge based on its betweenness
