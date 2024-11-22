@@ -13,7 +13,6 @@ from src.functions import poipairs_by_distance, new_edge_intersects
 def greedy_triangulation_in_steps(
     graph: ig.Graph,
     pois: list[int],
-    numIterations: int,
     subgraph_percentages: list[float],
     prune_quantiles: Optional[list[float]] = None,
     prune_measure: str = "betweenness",
@@ -41,22 +40,20 @@ def greedy_triangulation_in_steps(
         prune_quantiles, desc=f"Greedy triangulation on {subgraph_percentage * 100}% subgraph", leave=False
     ):
         
-        pois_continously = []
+        pois_added = []
+        pois_not_added = pois
         abstract_gt = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
         pruned_graph = abstract_gt
         gt_edges = None
-        for iter in range(0, numIterations):
-
-            subgraph_pois = random.sample(pois, int(len(pois) * subgraph_percentages[iter]))
-            pois_continously = pois_continously.append(subgraph_pois)
+        for percentage in subgraph_percentages:
+            subgraph_pois = random.sample(pois_not_added, int(len(pois) * percentage))
+            pois_not_added = pois_not_added.remove(subgraph_pois)
+            pois_added = pois_added.append(subgraph_pois)
             # subgraph_poi_indices = {graph.vs.find(id=poi).index for poi in subgraph_pois}
-            subgraph_poi_pairs = poipairs_by_distance(graph, pois_continously, return_distances=True)
+            subgraph_poi_pairs = poipairs_by_distance(graph, pois_added, return_distances=True)
 
             gt_edges = gt_edges + _greedy_triangulation(pruned_graph, subgraph_poi_pairs, gt_edges)
-            # TODO: We should only prune edges added in the last greedy triangulation
             pruned_graph = prune_graph(pruned_graph, prune_quantile, prune_measure)
-  
-            abstract_gts.append(pruned_graph)
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
