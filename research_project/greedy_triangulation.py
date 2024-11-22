@@ -32,10 +32,6 @@ def greedy_triangulation_in_steps(
     if len(poi_pairs) == 0:
         return [], []
 
-    subgraph_pois = random.sample(pois, int(len(pois) * subgraph_percentages))
-    # subgraph_poi_indices = {graph.vs.find(id=poi).index for poi in subgraph_pois}
-    subgraph_poi_pairs = poipairs_by_distance(graph, subgraph_pois, return_distances=True)
-
     edgeless_graph = copy.deepcopy(graph)
     for edge in edgeless_graph.es:
         edgeless_graph.es.delete(edge)
