@@ -9,6 +9,19 @@ from tqdm.notebook import tqdm
 
 from src.functions import poipairs_by_distance, new_edge_intersects
 
+def create_pois_groups(subgraph_percentages: list[float], pois: list[int]) -> list[int]:
+    pois_groups = []
+    pois_not_added = pois
+    for i in range (0, len(pois)):
+        group = random.sample(pois_not_added, int(len(pois) * subgraph_percentages[i]))
+        pois_groups.append(group)
+        pois_not_added.remove(group)
+
+    #Add the remaining pois to the last group
+    pois_groups.append(pois_not_added)
+
+    return pois_groups
+    
 
 def greedy_triangulation_in_steps(
     graph: ig.Graph,
@@ -39,14 +52,12 @@ def greedy_triangulation_in_steps(
     for prune_quantile in tqdm(
         prune_quantiles, desc=f"Greedy triangulation on {subgraph_percentage * 100}% subgraph", leave=False
     ):   
+        pois_groups = create_pois_groups(subgraph_percentages, pois)
         pois_added = []
-        pois_not_added = pois
         abstract_gt = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
         gt_edges = None
-        for percentage in subgraph_percentages:
-            subgraph_pois = random.sample(pois_not_added, int(len(pois) * percentage))
-            pois_not_added = pois_not_added.remove(subgraph_pois)
-            pois_added = pois_added.append(subgraph_pois)
+        for pois_subgroup in pois_groups:
+            pois_added = pois_added.append(pois_subgroup)
             # subgraph_poi_indices = {graph.vs.find(id=poi).index for poi in subgraph_pois}
             subgraph_poi_pairs = poipairs_by_distance(graph, pois_added, return_distances=True)
 
