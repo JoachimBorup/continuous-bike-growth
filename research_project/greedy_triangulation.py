@@ -12,8 +12,8 @@ from src.functions import poipairs_by_distance, new_edge_intersects
 def create_pois_groups(subgraph_percentages: list[float], pois: list[int]) -> list[int]:
     pois_groups = []
     pois_not_added = pois.copy()
-    for i in range (0, len(pois)):
-        group = random.sample(pois_not_added, int(len(pois) * subgraph_percentages[i]))
+    for p in subgraph_percentages:
+        group = random.sample(pois_not_added, int(len(pois) * p))
         pois_groups.append(group)
         pois_not_added.remove(group)
 
