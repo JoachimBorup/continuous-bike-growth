@@ -18,8 +18,13 @@ def create_pois_groups(subgraph_percentages: list[float], pois: list[int]) -> li
         for poi in group:
             pois_not_added.remove(poi)
 
-    #Add the remaining pois to the last group
-    pois_groups.append(pois_not_added)
+    groups = zip(pois_groups, subgraph_percentages)
+    random.shuffle(groups)
+    while pois_not_added:
+        # Sort the groups by the difference between their size and the desired percentage
+        groups = sorted(groups, key=lambda x: len(x[0]) / len(pois) - x[1])
+        # Add a POI to the group with the greatest difference
+        groups[0][0].append(pois_not_added.pop())
 
     return pois_groups
     
