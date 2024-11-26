@@ -15,7 +15,8 @@ def create_pois_groups(subgraph_percentages: list[float], pois: list[int]) -> li
     for p in subgraph_percentages:
         group = random.sample(pois_not_added, int(len(pois) * p))
         pois_groups.append(group)
-        pois_not_added.remove(group)
+        for poi in group:
+            pois_not_added.remove(poi)
 
     #Add the remaining pois to the last group
     pois_groups.append(pois_not_added)
