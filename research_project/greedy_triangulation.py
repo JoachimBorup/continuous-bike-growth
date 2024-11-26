@@ -59,20 +59,17 @@ def greedy_triangulation_in_steps(
         edgeless_graph.es.delete(edge)
 
     gts, abstract_gts = [], []
-    for prune_quantile in tqdm(
-        prune_quantiles, desc=f"Stepwise greedy triangulation on subgraphs", leave=False
-    ):
+    for prune_quantile in tqdm(prune_quantiles, desc=f"Stepwise greedy triangulation on subgraphs", leave=False):
         pois_groups = create_pois_groups(subgraph_percentages, pois)
         pois_added = []
+
         abstract_gt = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
-        gt_edges = None
+        gt_edges = set()
         for pois_subgroup in pois_groups:
             pois_added = pois_added.append(pois_subgroup)
-            # subgraph_poi_indices = {graph.vs.find(id=poi).index for poi in subgraph_pois}
             subgraph_poi_pairs = poipairs_by_distance(graph, pois_added, return_distances=True)
-
-            gt_edges = gt_edges + _greedy_triangulation(abstract_gt, subgraph_poi_pairs)
-            abstract_gt = prune_graph(abstract_gt, prune_quantile, prune_measure)
+            gt_edges = gt_edges.union(_greedy_triangulation(abstract_gt, subgraph_poi_pairs))
+            abstract_gt = prune_graph(abstract_gt, prune_quantile, prune_measure, gt_edges)
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
