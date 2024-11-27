@@ -246,7 +246,7 @@ def _prune_betweenness(graph: ig.Graph, prune_quantile: float, gt_edges: set[int
     return graph.subgraph_edges(subgraph_edges, delete_vertices=False)
 
 
-def _prune_closeness(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
+def _prune_closeness(graph: ig.Graph, prune_quantile: float, _: set[int]) -> ig.Graph:
     """
     Prune a graph based on closeness centrality, keeping only the vertices with closeness above the given quantile.
     The closeness of a vertex measures how close it is to all other vertices in the graph.
@@ -264,10 +264,10 @@ def _prune_closeness(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
     return graph.induced_subgraph(subgraph_vertices)
 
 
-def _prune_random(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
+def _prune_random(graph: ig.Graph, prune_quantile: float, gt_edges: set[int]) -> ig.Graph:
     """Prune a graph randomly, keeping only the edges up to the given quantile."""
     # Create a random order for the edges
-    edge_order = random.sample(range(graph.ecount()), k=graph.ecount())
+    edge_order = random.sample(sorted(gt_edges), len(gt_edges))
     # "lower" and + 1 so smallest quantile has at least one edge
-    index = np.quantile(np.arange(len(edge_order)), prune_quantile, method="lower") + 1
+    index = np.quantile(np.arange(len(gt_edges)), prune_quantile, method="lower") + 1
     return graph.subgraph_edges(edge_order[:index], delete_vertices=False)
