@@ -10,7 +10,7 @@ from tqdm.notebook import tqdm
 from src.functions import poipairs_by_distance, new_edge_intersects
 
 
-def create_pois_groups(subgraph_percentages: list[float], pois: list[int]) -> list[int]:
+def create_poi_groups(subgraph_percentages: list[float], pois: list[int]) -> list[list[int]]:
     pois_not_added = pois.copy()
     pois_groups = []
 
@@ -50,9 +50,11 @@ def greedy_triangulation_in_steps(
         return [], []
 
     poi_pairs = poipairs_by_distance(graph, pois, return_distances=True)
-    poi_indices = {graph.vs.find(id=poi).index for poi in pois}
     if len(poi_pairs) == 0:
         return [], []
+
+    poi_indices = {graph.vs.find(id=poi).index for poi in pois}
+    poi_groups = create_poi_groups(subgraph_percentages, pois)
 
     edgeless_graph = copy.deepcopy(graph)
     for edge in edgeless_graph.es:
@@ -60,15 +62,15 @@ def greedy_triangulation_in_steps(
 
     gts, abstract_gts = [], []
     for prune_quantile in tqdm(prune_quantiles, desc=f"Stepwise greedy triangulation on subgraphs", leave=False):
-        pois_groups = create_pois_groups(subgraph_percentages, pois)
-        pois_added = []
-
         abstract_gt = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
-        gt_edges = set()
-        for pois_subgroup in pois_groups:
-            pois_added = pois_added.append(pois_subgroup)
+        pois_added = set()
+
+        # Greedy triangulation on subgraphs
+        for poi_group in poi_groups:
+            pois_added = pois_added.union(poi_group)
             subgraph_poi_pairs = poipairs_by_distance(graph, pois_added, return_distances=True)
-            gt_edges = gt_edges.union(_greedy_triangulation(abstract_gt, subgraph_poi_pairs))
+
+            gt_edges = _greedy_triangulation(abstract_gt, subgraph_poi_pairs)
             abstract_gt = prune_graph(abstract_gt, prune_quantile, prune_measure, gt_edges)
 
         # Get node pairs we need to route, sorted by distance
