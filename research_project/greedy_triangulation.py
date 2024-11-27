@@ -10,48 +10,72 @@ from tqdm.notebook import tqdm
 from src.functions import poipairs_by_distance, new_edge_intersects
 
 
+def create_poi_groups(subgraph_percentages: list[float], pois: list[int]) -> list[list[int]]:
+    pois_not_added = pois.copy()
+    pois_groups = []
+
+    for p in subgraph_percentages:
+        group = random.sample(pois_not_added, int(len(pois) * p))
+        pois_groups.append(group)
+        for poi in group:
+            pois_not_added.remove(poi)
+
+    groups = list(zip(pois_groups, subgraph_percentages))
+    random.shuffle(groups)
+    while pois_not_added:
+        # Sort the groups by the difference between their size and the desired percentage
+        groups = sorted(groups, key=lambda x: len(x[0]) / len(pois) - x[1])
+        # Add a POI to the group with the greatest difference
+        groups[0][0].append(pois_not_added.pop())
+
+    return pois_groups
+
+
 def greedy_triangulation_in_steps(
     graph: ig.Graph,
     pois: list[int],
-    subgraph_percentage: float,
+    subgraph_percentages: list[float],
     prune_quantiles: Optional[list[float]] = None,
     prune_measure: str = "betweenness",
 ) -> tuple[list[ig.Graph], list[ig.Graph]]:
-    if 1 < subgraph_percentage < 0:
-        raise ValueError("Subgraph percentage must be between 0 and 1")
+    for percentage in subgraph_percentages:
+        if 1 < percentage < 0:
+            raise ValueError("Subgraph percentage must be between 0 and 1")
+    if sum(subgraph_percentages) != 1.0:
+        raise ValueError("Subgraph percentages must sum to 1.0")
+
     if prune_quantiles is None:
         prune_quantiles = [1]
     if len(pois) < 2:
         return [], []
+
     poi_pairs = poipairs_by_distance(graph, pois, return_distances=True)
-    poi_indices = {graph.vs.find(id=poi).index for poi in pois}
     if len(poi_pairs) == 0:
         return [], []
 
-    subgraph_pois = random.sample(pois, int(len(pois) * subgraph_percentage))
-    # subgraph_poi_indices = {graph.vs.find(id=poi).index for poi in subgraph_pois}
-    subgraph_poi_pairs = poipairs_by_distance(graph, subgraph_pois, return_distances=True)
+    poi_indices = {graph.vs.find(id=poi).index for poi in pois}
+    poi_groups = create_poi_groups(subgraph_percentages, pois)
 
     edgeless_graph = copy.deepcopy(graph)
     for edge in edgeless_graph.es:
         edgeless_graph.es.delete(edge)
 
     gts, abstract_gts = [], []
-    for prune_quantile in tqdm(
-        prune_quantiles, desc=f"Greedy triangulation on {subgraph_percentage * 100}% subgraph", leave=False
-    ):
+    for prune_quantile in tqdm(prune_quantiles, desc=f"Stepwise greedy triangulation on subgraphs", leave=False):
         abstract_gt = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
+        pois_added = set()
 
-        _greedy_triangulation(abstract_gt, subgraph_poi_pairs)
-        pruned_graph = prune_graph(abstract_gt, prune_quantile, prune_measure)
+        # Greedy triangulation on subgraphs
+        for poi_group in poi_groups:
+            pois_added = pois_added.union(poi_group)
+            subgraph_poi_pairs = poipairs_by_distance(graph, pois_added, return_distances=True)
 
-        # Add the rest of the vertices to the GT graph and run greedy triangulation again
-        gt_edges = _greedy_triangulation(pruned_graph, poi_pairs)
-        pruned_graph = prune_graph(pruned_graph, prune_quantile, prune_measure, gt_edges)
+            gt_edges = _greedy_triangulation(abstract_gt, subgraph_poi_pairs)
+            abstract_gt = prune_graph(abstract_gt, prune_quantile, prune_measure, gt_edges)
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
-        for edge in pruned_graph.es:
+        for edge in abstract_gt.es:
             route_node_pairs[(edge.source_vertex["id"], edge.target_vertex["id"])] = edge["weight"]
         route_node_pairs = sorted(route_node_pairs.items(), key=lambda x: x[1])
 
@@ -63,7 +87,7 @@ def greedy_triangulation_in_steps(
             sp = set(graph.get_shortest_path(v, w, weights="weight", output="vpath"))
             gt_indices = gt_indices.union(sp)
 
-        abstract_gts.append(pruned_graph)
+        abstract_gts.append(abstract_gt)
         gts.append(graph.induced_subgraph(gt_indices.union(poi_indices)))
 
     return gts, abstract_gts
@@ -222,7 +246,7 @@ def _prune_betweenness(graph: ig.Graph, prune_quantile: float, gt_edges: set[int
     return graph.subgraph_edges(subgraph_edges, delete_vertices=False)
 
 
-def _prune_closeness(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
+def _prune_closeness(graph: ig.Graph, prune_quantile: float, _: set[int]) -> ig.Graph:
     """
     Prune a graph based on closeness centrality, keeping only the vertices with closeness above the given quantile.
     The closeness of a vertex measures how close it is to all other vertices in the graph.
@@ -240,10 +264,10 @@ def _prune_closeness(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
     return graph.induced_subgraph(subgraph_vertices)
 
 
-def _prune_random(graph: ig.Graph, prune_quantile: float) -> ig.Graph:
+def _prune_random(graph: ig.Graph, prune_quantile: float, gt_edges: set[int]) -> ig.Graph:
     """Prune a graph randomly, keeping only the edges up to the given quantile."""
     # Create a random order for the edges
-    edge_order = random.sample(range(graph.ecount()), k=graph.ecount())
+    edge_order = random.sample(sorted(gt_edges), len(gt_edges))
     # "lower" and + 1 so smallest quantile has at least one edge
-    index = np.quantile(np.arange(len(edge_order)), prune_quantile, method="lower") + 1
+    index = np.quantile(np.arange(len(gt_edges)), prune_quantile, method="lower") + 1
     return graph.subgraph_edges(edge_order[:index], delete_vertices=False)
