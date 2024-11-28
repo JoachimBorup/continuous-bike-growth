@@ -57,7 +57,7 @@ cities = {}
 with open(PATH["parameters"] + 'cities.csv') as f:
     csvreader = csv.DictReader(f, delimiter=';')
     for row in csvreader:
-        if row['placeid'] not in ['montreal']:
+        if row['placeid'] not in ['copenhagen']:
             continue
         cities[row['placeid']] = {}
         for field in csvreader.fieldnames[1:]:

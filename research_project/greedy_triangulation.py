@@ -7,7 +7,7 @@ import igraph as ig
 import numpy as np
 from tqdm.notebook import tqdm
 
-from src.functions import poipairs_by_distance, new_edge_intersects
+# from src.functions import poipairs_by_distance, new_edge_intersects
 
 
 def create_poi_groups(subgraph_percentages: list[float], pois: list[int]) -> list[list[int]]:
