@@ -71,7 +71,9 @@ def greedy_triangulation_in_steps(
             subgraph_poi_pairs = poipairs_by_distance(graph, pois_added, return_distances=True)
 
             gt_edges = _greedy_triangulation(abstract_gt, subgraph_poi_pairs)
-            abstract_gt = prune_graph(abstract_gt, prune_quantile, prune_measure, gt_edges)
+            print(f'Number of vertices in graph {abstract_gt.vcount()}')
+            abstract_gt = prune_graph(abstract_gt, prune_quantile, prune_measure, pois, gt_edges)
+            print(f'Number of vertices in graph {abstract_gt.vcount()}')
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
@@ -145,7 +147,7 @@ def _greedy_triangulation_routing(
         abstract_gt = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
 
         _greedy_triangulation(abstract_gt, poi_pairs)
-        pruned_graph = prune_graph(abstract_gt, prune_quantile, prune_measure)
+        pruned_graph = prune_graph(abstract_gt, prune_quantile, prune_measure, pois)
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
@@ -179,7 +181,10 @@ def _greedy_triangulation(graph: ig.Graph, poi_pairs: list[tuple[tuple[int, int]
     edges_added = set()
 
     # Add edges between POIs in ascending order of distance
+    i = 0
     for poi_pair, distance in poi_pairs:
+        print(i)
+        i = i+1
         v = graph.vs.find(id=poi_pair[0]).index
         w = graph.vs.find(id=poi_pair[1]).index
         if not new_edge_intersects(graph, (
@@ -195,6 +200,7 @@ def prune_graph(
     graph: ig.Graph,
     prune_quantile: float,
     prune_measure: str,
+    pois: list[int],
     gt_edges: Optional[set[int]] = None,
 ) -> ig.Graph:
     """
@@ -211,17 +217,16 @@ def prune_graph(
     :param gt_edges: The indices of the edges added during the last greedy triangulation. Defaults to all edges.
     :return: The pruned graph - a subgraph of the input graph.
     """
-    prune_measures = {
-        "betweenness": _prune_betweenness,
-        "closeness": _prune_closeness,
-        "random": _prune_random,
-    }
-
     if not gt_edges:
         gt_edges = set(range(graph.ecount()))
+    pois = set(pois)
 
-    if prune_measure in prune_measures:
-        return prune_measures[prune_measure](graph, prune_quantile, gt_edges)
+    if prune_measure == "betweenness":
+        return _prune_betweenness(graph, prune_quantile, gt_edges)
+    if prune_measure == "closeness":
+        return _prune_closeness(graph, prune_quantile, pois)
+    if prune_measure == "random":
+        return _prune_random(graph, prune_quantile, gt_edges)
 
     raise ValueError(f"Unknown pruning measure: {prune_measure}")
 
@@ -246,21 +251,30 @@ def _prune_betweenness(graph: ig.Graph, prune_quantile: float, gt_edges: set[int
     return graph.subgraph_edges(subgraph_edges, delete_vertices=False)
 
 
-def _prune_closeness(graph: ig.Graph, prune_quantile: float, _: set[int]) -> ig.Graph:
+def _prune_closeness(graph: ig.Graph, prune_quantile: float, pois: set[int]) -> ig.Graph:
     """
     Prune a graph based on closeness centrality, keeping only the vertices with closeness above the given quantile.
     The closeness of a vertex measures how close it is to all other vertices in the graph.
     """
     closeness = graph.closeness(vertices=None, weights="weight")
+    closeness = [0 if math.isnan(x) else x for x in closeness]
+    print(f'is the graph connected {graph.is_connected()}')
+    print(closeness)
     quantile = np.quantile(closeness, 1 - prune_quantile)
     subgraph_vertices = []
 
     for i in range(graph.vcount()):
         if closeness[i] >= quantile:
+            print(f'closeness: {closeness[i]}')
+            print(f'quantile: {quantile}')
+            print("true, adding to list")
             subgraph_vertices.append(i)
+        else:
+            print(f'closeness: {closeness[i]}')
+            print(f'quantile: {quantile}')
+            print("false, skip adding to list")
         graph.vs[i]["cc"] = closeness[i]
 
-    # TODO: Check whether vertices are deleted
     return graph.induced_subgraph(subgraph_vertices)
 
 
