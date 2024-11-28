@@ -8,7 +8,7 @@ import numpy as np
 from tqdm.notebook import tqdm
 
 # If you want to see python hints uncomment the following line
-#from src.functions import poipairs_by_distance, new_edge_intersects
+# from src.functions import poipairs_by_distance, new_edge_intersects
 
 
 def create_poi_groups(subgraph_percentages: list[float], pois: list[int]) -> list[list[int]]:
@@ -72,9 +72,7 @@ def greedy_triangulation_in_steps(
             subgraph_poi_pairs = poipairs_by_distance(graph, pois_added, return_distances=True)
 
             gt_edges = _greedy_triangulation(abstract_gt, subgraph_poi_pairs)
-            print(f'Number of vertices in graph {abstract_gt.vcount()}')
-            abstract_gt = prune_graph(abstract_gt, prune_quantile, prune_measure, pois, gt_edges)
-            print(f'Number of vertices in graph {abstract_gt.vcount()}')
+            abstract_gt = prune_graph(abstract_gt, prune_quantile, prune_measure, gt_edges)
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
@@ -182,10 +180,7 @@ def _greedy_triangulation(graph: ig.Graph, poi_pairs: list[tuple[tuple[int, int]
     edges_added = set()
 
     # Add edges between POIs in ascending order of distance
-    i = 0
     for poi_pair, distance in poi_pairs:
-        print(i)
-        i = i+1
         v = graph.vs.find(id=poi_pair[0]).index
         w = graph.vs.find(id=poi_pair[1]).index
         if not new_edge_intersects(graph, (
