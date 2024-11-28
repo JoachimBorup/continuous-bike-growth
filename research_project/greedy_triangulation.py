@@ -148,7 +148,7 @@ def _greedy_triangulation_routing(
         abstract_gt = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
 
         _greedy_triangulation(abstract_gt, poi_pairs)
-        pruned_graph = prune_graph(abstract_gt, prune_quantile, prune_measure, pois)
+        pruned_graph = prune_graph(abstract_gt, prune_quantile, prune_measure)
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
@@ -201,7 +201,6 @@ def prune_graph(
     graph: ig.Graph,
     prune_quantile: float,
     prune_measure: str,
-    pois: list[int],
     gt_edges: Optional[set[int]] = None,
 ) -> ig.Graph:
     """
@@ -220,16 +219,17 @@ def prune_graph(
     """
     if not gt_edges:
         gt_edges = set(range(graph.ecount()))
-    pois = set(pois)
 
-    if prune_measure == "betweenness":
-        return _prune_betweenness(graph, prune_quantile, gt_edges)
-    if prune_measure == "closeness":
-        return _prune_closeness(graph, prune_quantile, pois)
-    if prune_measure == "random":
-        return _prune_random(graph, prune_quantile, gt_edges)
+    prune_measures = {
+        "betweenness": _prune_betweenness,
+        "closeness": _prune_closeness,
+        "random": _prune_random,
+    }
 
-    raise ValueError(f"Unknown pruning measure: {prune_measure}")
+    if prune_measure not in prune_measures:
+        raise ValueError(f"Unknown pruning measure: {prune_measure}")
+
+    return prune_measures[prune_measure](graph, prune_quantile, gt_edges)
 
 
 def _prune_betweenness(graph: ig.Graph, prune_quantile: float, gt_edges: set[int]) -> ig.Graph:
@@ -252,31 +252,35 @@ def _prune_betweenness(graph: ig.Graph, prune_quantile: float, gt_edges: set[int
     return graph.subgraph_edges(subgraph_edges, delete_vertices=False)
 
 
-def _prune_closeness(graph: ig.Graph, prune_quantile: float, pois: set[int]) -> ig.Graph:
+def _prune_closeness(graph: ig.Graph, prune_quantile: float, gt_edges: set[int]) -> ig.Graph:
     """
     Prune a graph based on closeness centrality, keeping only the vertices with closeness above the given quantile.
     The closeness of a vertex measures how close it is to all other vertices in the graph.
     """
+    def vertices_in_edges(edges: set[int]) -> set[int]:
+        return {v for e in edges for v in (graph.es[e].source, graph.es[e].target)}
+
+    gt_vertices = vertices_in_edges(gt_edges)
+    previous_vertices = vertices_in_edges(set(range(graph.ecount())) - gt_edges)
+
     closeness = graph.closeness(vertices=None, weights="weight")
-    closeness = [0 if math.isnan(x) else x for x in closeness]
-    print(f'is the graph connected {graph.is_connected()}')
-    print(closeness)
-    quantile = np.quantile(closeness, 1 - prune_quantile)
-    subgraph_vertices = []
+    quantile = np.quantile([closeness[v] for v in gt_vertices], 1 - prune_quantile)
+    new_vertices = set()
 
     for i in range(graph.vcount()):
-        if closeness[i] >= quantile:
-            print(f'closeness: {closeness[i]}')
-            print(f'quantile: {quantile}')
-            print("true, adding to list")
-            subgraph_vertices.append(i)
-        else:
-            print(f'closeness: {closeness[i]}')
-            print(f'quantile: {quantile}')
-            print("false, skip adding to list")
+        if i in gt_vertices and closeness[i] >= quantile:
+            new_vertices.add(i)
         graph.vs[i]["cc"] = closeness[i]
 
-    return graph.induced_subgraph(subgraph_vertices)
+    subgraph_vertices = new_vertices.union(previous_vertices)
+    edges_to_remove = set()
+    for edge in graph.es:
+        if edge.source not in subgraph_vertices or edge.target not in subgraph_vertices:
+            edges_to_remove.add(edge.index)
+
+    # Remove edges from the graph without deleting any vertices
+    graph.delete_edges(edges_to_remove)
+    return graph
 
 
 def _prune_random(graph: ig.Graph, prune_quantile: float, gt_edges: set[int]) -> ig.Graph:
