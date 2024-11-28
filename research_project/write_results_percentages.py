@@ -1,5 +1,13 @@
-
-def write_result_with_percentages(res:dict, mode:str, placeid:str, iteration:str, poi_source, prune_measure:str, suffix:str, dictnested = {}):
+import os
+def write_result_with_percentages(
+        res:dict,
+        mode:str, 
+        placeid:str, 
+        iteration:str, 
+        poi_source, 
+        prune_measure:str, 
+        suffix:str, 
+        dictnested = {}):
 
     """Write results (pickle or dict to csv)
     """
@@ -13,7 +21,15 @@ def write_result_with_percentages(res:dict, mode:str, placeid:str, iteration:str
     else:
         filename = placeid + "_" + prune_measure + suffix
 
-    with open(PATH["results"] + placeid + "/" + "iteration/" + iteration + "/" + filename, openmode) as f:
+    file_path = f'{PATH["results"]}{placeid}/iteration/{iteration}/{filename}'
+    dir_path = os.path.dirname(file_path)  # Extract directory path
+
+    # Ensure the directory exists before opening the file
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path, exist_ok=True)
+
+    # Open the file safely
+    with open(file_path, openmode) as f:
         if mode == "pickle":
             pickle.dump(res, f)
         elif mode == "dict":
