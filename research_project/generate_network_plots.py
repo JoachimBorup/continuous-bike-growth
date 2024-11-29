@@ -1,4 +1,13 @@
 import os
+import pickle
+
+import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib.collections import PatchCollection
+
+# from parameters.parameters import prune_measures, nodesize_grown, plotparam, poi_source
+# from src.functions import csv_to_ig, nxdraw, nodesize_from_pois, initplot, cov_to_patchlist
+# from src.path import PATH
 
 
 def subgraph_percentages_with_iterations_plot(placeid:str, pms:list, subgraphs_percentages:list, iterations:int):
@@ -160,4 +169,78 @@ def existing_network_plot(placeid:str, prune_measures:list):
         nxdraw(G_carall, "poi_unreached", map_center, nnids, "nx.draw_networkx_nodes", nodesize_poi)
         plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_carall_poi_' + poi_source + '.pdf', bbox_inches="tight")
         plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_carall_poi_' + poi_source + '.png', bbox_inches="tight", dpi=plotparam["dpi"])
+        plt.close()
+
+
+def coverage_plots(place_id: str, prune_measure: str):
+    print(f"{place_id}: Plotting network covers")
+
+    # Load networks
+    G_carall = csv_to_ig(PATH["data"] + place_id + "/", place_id, 'carall')
+    map_center = nxdraw(G_carall, "carall")
+
+    # Load POIs
+    with open(PATH["data"] + place_id + "/" + place_id + '_poi_' + poi_source + '_nnidscarall.csv') as f:
+        nnids = [int(line.rstrip()) for line in f]
+    nodesize_poi = nodesize_from_pois(nnids)
+
+    # Load results
+    filename = place_id + '_poi_' + poi_source + "_" + prune_measure + ".pickle"
+    with open(PATH["results"] + place_id + "/" + filename, 'rb') as f:
+        res = pickle.load(f)
+
+    # Load covers
+    filename = place_id + '_poi_' + poi_source + "_" + prune_measure + "_covers"
+    with open(PATH["results"] + place_id + "/" + filename + ".pickle", 'rb') as f:
+        covs = pickle.load(f)
+    filename = place_id + "_" + "existing_covers"
+    with open(PATH["results"] + place_id + "/" + filename + ".pickle", 'rb') as f:
+        cov_car = pickle.load(f)['carall']
+
+    # Construct and plot patches from covers
+    patchlist_car, patchlist_car_holes = cov_to_patchlist(cov_car, map_center)
+    for GT, prune_quantile, cov in zip(res["GTs"], res["prune_quantiles"], covs.values()):
+        fig = initplot()
+
+        # Covers
+        axes = fig.add_axes([0, 0, 1, 1])  # left, bottom, width, height (range 0 to 1)
+        patchlist_bike, patchlist_bike_holes = cov_to_patchlist(cov, map_center)
+
+        # We have this contrived order due to alphas, holes, and matplotlib's inability to draw polygon patches with holes. This only works because the car network is a superset of the bike network.
+        # car orange, bike white, bike blue, bike holes white, bike holes orange, car holes white
+        patchlist_combined = patchlist_car + patchlist_bike + patchlist_bike + patchlist_bike_holes + patchlist_bike_holes + patchlist_car_holes
+        pc = PatchCollection(patchlist_combined)
+        colors = np.array([[255 / 255, 115 / 255, 56 / 255, 0.2] for _ in range(len(patchlist_car))])  # car orange
+        if len(patchlist_bike):
+            colors = np.append(colors, [[1, 1, 1, 1] for _ in range(len(patchlist_bike))], axis=0)  # bike white
+            colors = np.append(colors, [[86 / 255, 220 / 255, 244 / 255, 0.4] for _ in range(len(patchlist_bike))],
+                               axis=0)  # bike blue
+        if len(patchlist_bike_holes):
+            colors = np.append(colors, [[1, 1, 1, 1] for _ in range(len(patchlist_bike_holes))],
+                               axis=0)  # bike holes white
+        if len(patchlist_bike_holes):
+            colors = np.append(colors,
+                               [[255 / 255, 115 / 255, 56 / 255, 0.2] for _ in range(len(patchlist_bike_holes))],
+                               axis=0)  # bike holes orange
+        if len(patchlist_car_holes):
+            colors = np.append(colors, [[1, 1, 1, 1] for _ in range(len(patchlist_car_holes))],
+                               axis=0)  # car holes white
+        pc.set_facecolors(colors)
+        pc.set_edgecolors(np.array([[0, 0, 0, 0.4] for _ in range(
+            len(patchlist_combined))]))  # remove this line if the outline of the full coverage should remain
+        axes.add_collection(pc)
+        axes.set_aspect('equal')
+        axes.set_xmargin(0.01)
+        axes.set_ymargin(0.01)
+        axes.plot()
+
+        # Networks
+        nxdraw(G_carall, "carall", map_center)
+        nxdraw(GT, "bikegrown", map_center, nodesize=nodesize_grown)
+        nxdraw(G_carall, "poi_unreached", map_center, nnids, "nx.draw_networkx_nodes", nodesize_poi)
+        nxdraw(G_carall, "poi_reached", map_center, list(set([v["id"] for v in GT.vs]).intersection(set(nnids))),
+               "nx.draw_networkx_nodes", nodesize_poi)
+        plt.savefig(PATH["plots_networks"] + place_id + "/" + place_id + '_GTallcover_poi_' + poi_source + "_" +
+                    prune_measures[prune_measure] + "{:.3f}".format(prune_quantile) + '.png', bbox_inches="tight",
+                    dpi=plotparam["dpi"])
         plt.close()
