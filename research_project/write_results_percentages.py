@@ -2,7 +2,8 @@ import os
 def write_result_with_percentages(
         res:dict,
         mode:str, 
-        placeid:str, 
+        placeid:str,
+        subgraph_percentage:str, 
         iteration:str, 
         poi_source, 
         prune_measure:str, 
@@ -21,7 +22,7 @@ def write_result_with_percentages(
     else:
         filename = placeid + "_" + prune_measure + suffix
 
-    file_path = f'{PATH["results"]}{placeid}/iteration/{iteration}/{filename}'
+    file_path = f'{PATH["results"]}{placeid}/{subgraph_percentage}/{iteration}/{filename}'
     dir_path = os.path.dirname(file_path)  # Extract directory path
 
     # Ensure the directory exists before opening the file
