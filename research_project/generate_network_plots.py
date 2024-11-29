@@ -21,7 +21,7 @@ def subgraph_percentages_with_iterations_plot(placeid:str, pms:list, subgraphs_p
         fig = initplot()
         nxdraw(G_carall, "carall", map_center)
         nxdraw(G_carall, "poi_unreached", map_center, nnids, "nx.draw_networkx_nodes", nodesize_poi)
-        plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_carall_poi_' + poi_source + '.pdf', bbox_inches="tight")
+        #plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_carall_poi_' + poi_source + '.pdf', bbox_inches="tight")
         plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_carall_poi_' + poi_source + '.png', bbox_inches="tight", dpi=plotparam["dpi"])
         plt.close()
         
@@ -49,7 +49,7 @@ def subgraph_percentages_with_iterations_plot(placeid:str, pms:list, subgraphs_p
                 nxdraw(res["MST_abstract"], "abstract", map_center, weighted = 6)
                 nxdraw(G_carall, "poi_unreached", map_center, nnids, "nx.draw_networkx_nodes", nodesize_poi)
                 nxdraw(G_carall, "poi_reached", map_center, list(set([v["id"] for v in res["MST"].vs]).intersection(set(nnids))), "nx.draw_networkx_nodes", nodesize_poi)
-                plt.savefig(PATH["plots_networks"] + placeid + "/" + subgraph_iteration_dir  + placeid + '_MSTabstract_poi_' + poi_source + '.pdf', bbox_inches="tight")
+                #plt.savefig(PATH["plots_networks"] + placeid + "/" + subgraph_iteration_dir  + placeid + '_MSTabstract_poi_' + poi_source + '.pdf', bbox_inches="tight")
                 plt.savefig(PATH["plots_networks"] + placeid + "/" + subgraph_iteration_dir + placeid + '_MSTabstract_poi_' + poi_source + '.png', bbox_inches="tight", dpi=plotparam["dpi"])
                 plt.close()
                 
@@ -59,7 +59,7 @@ def subgraph_percentages_with_iterations_plot(placeid:str, pms:list, subgraphs_p
                 nxdraw(res["MST"], "bikegrown", map_center, nodesize = nodesize_grown)
                 nxdraw(G_carall, "poi_unreached", map_center, nnids, "nx.draw_networkx_nodes", nodesize_poi)
                 nxdraw(G_carall, "poi_reached", map_center, list(set([v["id"] for v in res["MST"].vs]).intersection(set(nnids))), "nx.draw_networkx_nodes", nodesize_poi)
-                plt.savefig(PATH["plots_networks"] + placeid + "/" + subgraph_iteration_dir + placeid + '_MSTall_poi_' + poi_source + '.pdf', bbox_inches="tight")
+                #plt.savefig(PATH["plots_networks"] + placeid + "/" + subgraph_iteration_dir + placeid + '_MSTall_poi_' + poi_source + '.pdf', bbox_inches="tight")
                 plt.savefig(PATH["plots_networks"] + placeid + "/" + subgraph_iteration_dir + placeid + '_MSTall_poi_' + poi_source + '.png', bbox_inches="tight", dpi=plotparam["dpi"])
                 plt.close()
                 
@@ -70,7 +70,7 @@ def subgraph_percentages_with_iterations_plot(placeid:str, pms:list, subgraphs_p
                 nxdraw(res["MST_abstract"], "abstract", map_center, weighted = 6)
                 nxdraw(G_carall, "poi_unreached", map_center, nnids, "nx.draw_networkx_nodes", nodesize_poi)
                 nxdraw(G_carall, "poi_reached", map_center, list(set([v["id"] for v in res["MST"].vs]).intersection(set(nnids))), "nx.draw_networkx_nodes", nodesize_poi)
-                plt.savefig(PATH["plots_networks"] + placeid + "/" + subgraph_iteration_dir + placeid + '_MSTabstractall_poi_' + poi_source + '.pdf', bbox_inches="tight")
+                #plt.savefig(PATH["plots_networks"] + placeid + "/" + subgraph_iteration_dir + placeid + '_MSTabstractall_poi_' + poi_source + '.pdf', bbox_inches="tight")
                 plt.savefig(PATH["plots_networks"] + placeid + "/" + subgraph_iteration_dir + placeid + '_MSTabstractall_poi_' + poi_source + '.png', bbox_inches="tight", dpi=plotparam["dpi"])
                 plt.close()
                 
@@ -117,7 +117,7 @@ def existing_network_plot(placeid:str, prune_measures:list):
         # PLOT existing networks
         fig = initplot()
         nxdraw(G_carall, "carall", map_center)
-        plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_carall.pdf', bbox_inches="tight")
+        #plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_carall.pdf', bbox_inches="tight")
         plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_carall.png', bbox_inches="tight", dpi=plotparam["dpi"])
         plt.close()
         
@@ -125,7 +125,7 @@ def existing_network_plot(placeid:str, prune_measures:list):
             G_biketrack = csv_to_ig(PATH["data"] + placeid + "/", placeid, 'biketrack')
             fig = initplot()
             nxdraw(G_biketrack, "biketrack", map_center)
-            plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_biketrack.pdf', bbox_inches="tight")
+            #plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_biketrack.pdf', bbox_inches="tight")
             plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_biketrack.png', bbox_inches="tight", dpi=plotparam["dpi"])
             plt.close()
             
@@ -133,7 +133,7 @@ def existing_network_plot(placeid:str, prune_measures:list):
             nxdraw(G_carall, "carall", map_center)
             nxdraw(G_biketrack, "biketrack", map_center, list(set([v["id"] for v in G_biketrack.vs]).intersection(set([v["id"] for v in G_carall.vs]))))
             nxdraw(G_biketrack, "biketrack_offstreet", map_center, list(set([v["id"] for v in G_biketrack.vs]).difference(set([v["id"] for v in G_carall.vs]))))
-            plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_biketrackcarall.pdf', bbox_inches="tight")
+            #plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_biketrackcarall.pdf', bbox_inches="tight")
             plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_biketrackcarall.png', bbox_inches="tight", dpi=plotparam["dpi"])
             plt.close()
         except:
@@ -143,7 +143,7 @@ def existing_network_plot(placeid:str, prune_measures:list):
             G_bikeable = csv_to_ig(PATH["data"] + placeid + "/", placeid, 'bikeable')
             fig = initplot()
             nxdraw(G_bikeable, "bikeable", map_center)
-            plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_bikeable.pdf', bbox_inches="tight")
+            #plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_bikeable.pdf', bbox_inches="tight")
             plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_bikeable.png', bbox_inches="tight", dpi=plotparam["dpi"])
             plt.close()
         except:
@@ -158,6 +158,6 @@ def existing_network_plot(placeid:str, prune_measures:list):
         fig = initplot()
         nxdraw(G_carall, "carall", map_center)
         nxdraw(G_carall, "poi_unreached", map_center, nnids, "nx.draw_networkx_nodes", nodesize_poi)
-        plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_carall_poi_' + poi_source + '.pdf', bbox_inches="tight")
+        #plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_carall_poi_' + poi_source + '.pdf', bbox_inches="tight")
         plt.savefig(PATH["plots_networks"] + placeid + "/" + placeid + '_carall_poi_' + poi_source + '.png', bbox_inches="tight", dpi=plotparam["dpi"])
         plt.close()
