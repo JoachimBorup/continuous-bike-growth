@@ -255,9 +255,9 @@ def _prune_closeness(graph: ig.Graph, prune_quantile: float, gt_edges: set[int])
     for e in set(range(graph.ecount())) - gt_edges:
         previous_vertices.add(graph.es[e].source)
         previous_vertices.add(graph.es[e].target)
-    gt_vertices = set(range(graph.ecount())) - previous_vertices
+    gt_vertices = set(range(graph.vcount())) - previous_vertices
 
-    closeness = graph.closeness(vertices=None, weights="weight")
+    closeness = np.nan_to_num(graph.closeness(vertices=None, weights="weight"))
     quantile = np.quantile([closeness[v] for v in gt_vertices], 1 - prune_quantile)
 
     subgraph_vertices = set(previous_vertices)
