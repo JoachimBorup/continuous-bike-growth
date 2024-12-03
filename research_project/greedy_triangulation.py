@@ -237,7 +237,7 @@ def _prune_betweenness(graph: ig.Graph, prune_quantile: float, gt_edges: set[int
     subgraph_edges = []
 
     for i in range(graph.ecount()):
-        if i in gt_edges and edge_betweenness[i] >= quantile:
+        if i not in gt_edges or edge_betweenness[i] >= quantile:
             subgraph_edges.append(i)
         graph.es[i]["bw"] = edge_betweenness[i]
         # For visualization, scale the width of the edge based on its betweenness
