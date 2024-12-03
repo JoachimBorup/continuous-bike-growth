@@ -251,30 +251,33 @@ def _prune_closeness(graph: ig.Graph, prune_quantile: float, gt_edges: set[int])
     Prune a graph based on closeness centrality, keeping only the vertices with closeness above the given quantile.
     The closeness of a vertex measures how close it is to all other vertices in the graph.
     """
-    def vertices_in_edges(edges: set[int]) -> set[int]:
-        return {v for e in edges for v in (graph.es[e].source, graph.es[e].target)}
-
-    gt_vertices = vertices_in_edges(gt_edges)
-    previous_vertices = vertices_in_edges(set(range(graph.ecount())) - gt_edges)
+    previous_vertices = set()
+    for e in set(range(graph.ecount())) - gt_edges:
+        previous_vertices.add(graph.es[e].source)
+        previous_vertices.add(graph.es[e].target)
+    gt_vertices = set(range(graph.ecount())) - previous_vertices
 
     closeness = graph.closeness(vertices=None, weights="weight")
     quantile = np.quantile([closeness[v] for v in gt_vertices], 1 - prune_quantile)
-    new_vertices = set()
 
+    subgraph_vertices = set(previous_vertices)
     for i in range(graph.vcount()):
         if i in gt_vertices and closeness[i] >= quantile:
-            new_vertices.add(i)
+            subgraph_vertices.add(i)
         graph.vs[i]["cc"] = closeness[i]
 
-    subgraph_vertices = new_vertices.union(previous_vertices)
     edges_to_remove = set()
     for edge in graph.es:
+        # Consider only the edges added during the last greedy triangulation
+        if edge.index not in gt_edges:
+            continue
+        # Remove the edge if either of its vertices is not in the pruned subgraph
         if edge.source not in subgraph_vertices or edge.target not in subgraph_vertices:
             edges_to_remove.add(edge.index)
 
-    # Remove edges from the graph without deleting any vertices
-    graph.delete_edges(edges_to_remove)
-    return graph
+    subgraph = copy.deepcopy(graph)
+    subgraph.delete_edges(edges_to_remove)
+    return subgraph
 
 
 def _prune_random(graph: ig.Graph, prune_quantile: float, gt_edges: set[int]) -> ig.Graph:
