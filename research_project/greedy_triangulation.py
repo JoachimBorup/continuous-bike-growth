@@ -279,8 +279,9 @@ def _prune_closeness(graph: ig.Graph, prune_quantile: float, gt_edges: set[int])
 
 def _prune_random(graph: ig.Graph, prune_quantile: float, gt_edges: set[int]) -> ig.Graph:
     """Prune a graph randomly, keeping only the edges up to the given quantile."""
+    old_edges = [i for i in range(graph.ecount()) if i not in gt_edges]
     # Create a random order for the edges
     edge_order = random.sample(sorted(gt_edges), len(gt_edges))
     # "lower" and + 1 so smallest quantile has at least one edge
-    index = np.quantile(np.arange(len(gt_edges)), prune_quantile, method="lower") + 1
-    return graph.subgraph_edges(edge_order[:index], delete_vertices=False)
+    index = np.quantile(np.arange(len(edge_order)), prune_quantile, method="lower") + 1
+    return graph.subgraph_edges(old_edges + edge_order[:index], delete_vertices=False)
