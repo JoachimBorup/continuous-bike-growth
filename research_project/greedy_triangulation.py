@@ -63,14 +63,14 @@ def greedy_triangulation_in_steps(
 
     gts, abstract_gts = [], []
     for prune_quantile in tqdm(prune_quantiles, desc=f"Stepwise greedy triangulation on subgraphs", leave=False):
+        # The abstract GT consists of the POIs only, and initially has no edges
         abstract_gt = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
         pois_added = set()
 
         # Greedy triangulation on subgraphs
-        for poi_group in poi_groups:
-            pois_added = pois_added.union(poi_group)
+        for subgraph_pois in poi_groups:
+            pois_added.update(subgraph_pois)
             subgraph_poi_pairs = poipairs_by_distance(graph, pois_added, return_distances=True)
-
             gt_edges = _greedy_triangulation(abstract_gt, subgraph_poi_pairs)
             abstract_gt = prune_graph(abstract_gt, prune_quantile, prune_measure, gt_edges)
 
@@ -262,6 +262,7 @@ def _prune_closeness(graph: ig.Graph, prune_quantile: float, gt_edges: set[int])
 
     subgraph_vertices = set(previous_vertices)
     for i in range(graph.vcount()):
+        # We add new vertices from the GT if their closeness is above the quantile
         if i in gt_vertices and closeness[i] >= quantile:
             subgraph_vertices.add(i)
         graph.vs[i]["cc"] = closeness[i]
