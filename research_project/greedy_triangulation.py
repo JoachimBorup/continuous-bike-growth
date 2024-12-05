@@ -36,7 +36,7 @@ def greedy_triangulation_in_steps(
     graph: ig.Graph,
     pois: list[int],
     subgraph_percentages: list[float],
-    prune_quantiles: Optional[list[float]] = None,
+    prune_splits: tuple[list[float], list[int]],
     prune_measure: str = "betweenness",
 ) -> tuple[list[ig.Graph], list[ig.Graph]]:
     for percentage in subgraph_percentages:
@@ -44,9 +44,6 @@ def greedy_triangulation_in_steps(
             raise ValueError("Subgraph percentage must be between 0 and 1")
     if sum(subgraph_percentages) != 1.0:
         raise ValueError("Subgraph percentages must sum to 1.0")
-
-    if prune_quantiles is None:
-        prune_quantiles = [1]
     if len(pois) < 2:
         return [], []
 
@@ -62,7 +59,7 @@ def greedy_triangulation_in_steps(
         edgeless_graph.es.delete(edge)
 
     gts, abstract_gts = [], []
-    for prune_quantile in tqdm(prune_quantiles, desc=f"Stepwise greedy triangulation on subgraphs", leave=False):
+    for prune_quantile, num_of_edges_to_add in tqdm(prune_splits, desc=f"Stepwise greedy triangulation on subgraphs", leave=False):
         # The abstract GT consists of the POIs only, and initially has no edges
         abstract_gt = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
         pois_added = set()
@@ -72,7 +69,10 @@ def greedy_triangulation_in_steps(
             pois_added.update(subgraph_pois)
             subgraph_poi_pairs = poipairs_by_distance(graph, pois_added, return_distances=True)
             gt_edges = _greedy_triangulation(abstract_gt, subgraph_poi_pairs)
-            abstract_gt = prune_graph(abstract_gt, prune_quantile, prune_measure, gt_edges)
+            abstract_gt = __prune_graph(
+                abstract_gt, prune_quantile, num_of_edges_to_add // len(poi_groups), prune_measure, gt_edges
+            )
+            # TODO: Save intermediate results for visualization
 
         # Get node pairs we need to route, sorted by distance
         route_node_pairs = {}
@@ -289,3 +289,105 @@ def _prune_random(graph: ig.Graph, prune_quantile: float, gt_edges: set[int]) ->
     # "lower" and + 1 so smallest quantile has at least one edge
     index = np.quantile(np.arange(len(edge_order)), prune_quantile, method="lower") + 1
     return graph.subgraph_edges(old_edges + edge_order[:index], delete_vertices=False)
+
+
+def __prune_graph(
+    graph: ig.Graph,
+    prune_quantile: float,
+    num_of_edges_to_add: int,
+    prune_measure: str,
+    gt_edges: set[int],
+) -> ig.Graph:
+    """
+    # TODO: Correct the docstring
+    Prune a graph based on the given measure and quantile. Returns a subgraph of the input graph,
+    and does not mutate the input graph. The pruning is applied only to the edges added during the
+    last greedy triangulation. The pruning measure can be one of:
+
+    - 'betweenness': Edge betweenness.
+    - 'closeness': Vertex closeness centrality.
+    - 'random': Random edge pruning.
+
+    :param graph: The input graph to prune.
+    :param num_of_edges_to_add: The number of edges to add to the graph.
+    :param prune_measure: The measure used for pruning edges in the graph.
+    :param gt_edges: The indices of the edges added during the last greedy triangulation.
+    :return: The pruned graph - a subgraph of the input graph.
+    """
+    prune_measures = {
+        "betweenness": __prune_betweenness,
+        "closeness": __prune_closeness,
+        "random": __prune_random,
+    }
+
+    if prune_measure not in prune_measures:
+        raise ValueError(f"Unknown pruning measure: {prune_measure}")
+
+    return prune_measures[prune_measure](graph, prune_quantile, num_of_edges_to_add, gt_edges)
+
+
+def __prune_betweenness(graph: ig.Graph, _: float, num_of_edges_to_add: int, gt_edges: set[int]) -> ig.Graph:
+    """
+    Prune a graph based on edge betweenness, keeping only the edges with betweenness above the given quantile.
+    The betweenness of an edge is the number of shortest paths that pass through it.
+    """
+    edge_betweenness = graph.edge_betweenness(directed=False, weights="weight")
+
+    sorted_edges = sorted(range(graph.ecount()), key=lambda i: edge_betweenness[i], reverse=True)
+    sorted_edges = set([i for i in sorted_edges if i in gt_edges][:num_of_edges_to_add])
+
+    subgraph_edges = []
+    for i in range(graph.ecount()):
+        if i not in gt_edges or i in sorted_edges:
+            subgraph_edges.append(i)
+        graph.es[i]["bw"] = edge_betweenness[i]
+        # For visualization, scale the width of the edge based on its betweenness
+        graph.es[i]["width"] = math.sqrt(edge_betweenness[i] + 1) * 0.5
+
+    return graph.subgraph_edges(subgraph_edges, delete_vertices=False)
+
+
+def __prune_closeness(graph: ig.Graph, prune_quantile: float, num_of_edges_to_add: int, gt_edges: set[int]) -> ig.Graph:
+    """
+    Prune a graph based on closeness centrality, keeping only the vertices with closeness above the given quantile.
+    The closeness of a vertex measures how close it is to all other vertices in the graph.
+    """
+    # TODO: Figure out correlation between closeness centrality for vertices, and the number of edges Szell et al. added
+    raise NotImplementedError("Pruning based on closeness centrality is not yet implemented.")
+
+    previous_vertices = set()
+    for e in set(range(graph.ecount())) - gt_edges:
+        previous_vertices.add(graph.es[e].source)
+        previous_vertices.add(graph.es[e].target)
+    gt_vertices = set(range(graph.vcount())) - previous_vertices
+
+    closeness = np.nan_to_num(graph.closeness(vertices=None, weights="weight"))
+    quantile = np.quantile([closeness[v] for v in gt_vertices], 1 - prune_quantile)
+
+    subgraph_vertices = set(previous_vertices)
+    for i in range(graph.vcount()):
+        # We add new vertices from the GT if their closeness is above the quantile
+        if i in gt_vertices and closeness[i] >= quantile:
+            subgraph_vertices.add(i)
+        graph.vs[i]["cc"] = closeness[i]
+
+    edges_to_remove = set()
+    for edge in graph.es:
+        # Consider only the edges added during the last greedy triangulation
+        if edge.index not in gt_edges:
+            continue
+        # Remove the edge if either of its vertices is not in the pruned subgraph
+        if edge.source not in subgraph_vertices or edge.target not in subgraph_vertices:
+            edges_to_remove.add(edge.index)
+
+    subgraph = copy.deepcopy(graph)
+    subgraph.delete_edges(edges_to_remove)
+    return subgraph
+
+
+def __prune_random(graph: ig.Graph, _: float, num_of_edges_to_add, gt_edges: set[int]) -> ig.Graph:
+    """Prune a graph randomly, keeping only the edges up to the given quantile."""
+    old_edges = [i for i in range(graph.ecount()) if i not in gt_edges]
+    # Create a random order for the edges
+    edge_order = random.sample(sorted(gt_edges), len(gt_edges))
+    return graph.subgraph_edges(old_edges + edge_order[:num_of_edges_to_add], delete_vertices=False)
