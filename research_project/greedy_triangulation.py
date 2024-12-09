@@ -7,29 +7,11 @@ import igraph as ig
 import numpy as np
 from tqdm.notebook import tqdm
 
+from research_project.utils import split_collection
+
+
 # If you want to see python hints uncomment the following line
 # from src.functions import poipairs_by_distance, new_edge_intersects
-
-
-def create_poi_groups(subgraph_percentages: list[float], pois: list[int]) -> list[list[int]]:
-    pois_not_added = pois.copy()
-    pois_groups = []
-
-    for p in subgraph_percentages:
-        group = random.sample(pois_not_added, int(len(pois) * p))
-        pois_groups.append(group)
-        for poi in group:
-            pois_not_added.remove(poi)
-
-    groups = list(zip(pois_groups, subgraph_percentages))
-    random.shuffle(groups)
-    while pois_not_added:
-        # Sort the groups by the difference between their size and the desired percentage
-        groups = sorted(groups, key=lambda x: len(x[0]) / len(pois) - x[1])
-        # Add a POI to the group with the greatest difference
-        groups[0][0].append(pois_not_added.pop())
-
-    return pois_groups
 
 
 def greedy_triangulation_in_steps(
@@ -52,7 +34,7 @@ def greedy_triangulation_in_steps(
         return [], []
 
     poi_indices = {graph.vs.find(id=poi).index for poi in pois}
-    poi_groups = create_poi_groups(subgraph_percentages, pois)
+    poi_groups = split_collection(pois, subgraph_percentages)
 
     edgeless_graph = copy.deepcopy(graph)
     for edge in edgeless_graph.es:
