@@ -46,13 +46,15 @@ def greedy_triangulation_in_steps(
         abstract_gt = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
         pois_added = set()
 
+        temp_nums = list(map(len, split_collection(list(range(num_edges)), subgraph_percentages)))
+
         # Greedy triangulation on subgraphs
-        for subgraph_pois in poi_groups:
+        for subgraph_pois, edges_to_add in zip(poi_groups, temp_nums):
             pois_added.update(subgraph_pois)
             subgraph_poi_pairs = poipairs_by_distance(graph, pois_added, return_distances=True)
             gt_edges = _greedy_triangulation(abstract_gt, subgraph_poi_pairs)
             abstract_gt = __prune_graph(
-                abstract_gt, num_edges // len(poi_groups), prune_measure, gt_edges
+                abstract_gt, edges_to_add, prune_measure, gt_edges
             )
             # TODO: Save intermediate results for visualization
 
