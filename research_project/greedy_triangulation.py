@@ -7,7 +7,7 @@ import igraph as ig
 import numpy as np
 from tqdm.notebook import tqdm
 
-from research_project.utils import split_collection
+from research_project.utils import random_split_collection
 
 
 # If you want to see python hints uncomment the following line
@@ -34,7 +34,7 @@ def greedy_triangulation_in_steps(
         return [], []
 
     poi_indices = {graph.vs.find(id=poi).index for poi in pois}
-    poi_groups = split_collection(pois, subgraph_percentages)
+    poi_groups = random_split_collection(pois, subgraph_percentages)
 
     edgeless_graph = copy.deepcopy(graph)
     for edge in edgeless_graph.es:
@@ -46,7 +46,7 @@ def greedy_triangulation_in_steps(
         abstract_gt = copy.deepcopy(edgeless_graph.subgraph(poi_indices))
         pois_added = set()
 
-        temp_nums = list(map(len, split_collection(list(range(num_edges)), subgraph_percentages)))
+        temp_nums = list(map(len, random_split_collection(list(range(num_edges)), subgraph_percentages)))
 
         # Greedy triangulation on subgraphs
         for subgraph_pois, edges_to_add in zip(poi_groups, temp_nums):

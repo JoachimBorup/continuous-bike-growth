@@ -1,10 +1,18 @@
+import random
 from typing import TypeVar
 
 T = TypeVar('T')
 
 
-def split_collection(collection: list[T], percentages: list[float]) -> list[list[T]]:
-    """Split a collection into groups based on the given percentages."""
+def random_split_collection(collection: list[T], percentages: list[float]) -> list[list[T]]:
+    """
+    Split a collection into groups based on the given percentages.
+
+    :param collection: The collection to split.
+    :param percentages: The percentages of the total size of the collection to assign to each group.
+        Each percentage must be between 0 and 1, and the sum of all percentages must be 1.
+    :return: A list of groups, sampled randomly from the collection, with sizes based on the given percentages.
+    """
     if sum(percentages) != 1:
         raise ValueError("Percentages must sum to 1")
     if not all(0 <= p <= 1 for p in percentages):
@@ -26,10 +34,5 @@ def split_collection(collection: list[T], percentages: list[float]) -> list[list
             index = deviations[i % len(deviations)][0]
             group_sizes[index] += 1 if size_difference > 0 else -1
 
-    groups = []
-    start = 0
-    for size in group_sizes:
-        groups.append(collection[start:start + size])
-        start += size
-
-    return groups
+    collection = random.sample(collection, total)
+    return [collection[start:start + size] for start, size in zip([0] + group_sizes[:-1], group_sizes)]
