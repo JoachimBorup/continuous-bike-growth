@@ -95,7 +95,7 @@ def iterative_greedy_triangulation_routing(
             gt_indices.update(sp)
 
         abstract_gts.append(abstract_gt)
-        gts.append(graph.induced_subgraph(gt_indices.union(poi_indices)))
+        gts.append(graph.induced_subgraph(gt_indices))
 
     return gts, abstract_gts
 
