@@ -1,3 +1,5 @@
+from typing import Optional
+
 import igraph as ig
 import math
 import random
@@ -89,28 +91,39 @@ def sum_of_errors_pois(graph1: ig.Graph, graph2: ig.Graph, pois: list[int]) -> t
 
     for v in pois:
         for w in pois:
-            if v == w or v > w:
+            if v < w:
                 continue
 
-            shortest_path_g1_length = graph1.distances(graph1.vs.find(id=v).index, graph1.vs.find(id=w).index, weights='weight')
-            shortest_path_g2_length = graph2.distances(graph2.vs.find(id=v).index, graph2.vs.find(id=w).index, weights='weight')
+            sp_len_1 = get_shortest_path_length(graph1, v, w)
+            sp_len_2 = get_shortest_path_length(graph2, v, w)
 
-            if math.isinf(shortest_path_g1_length[0][0]) and math.isinf(shortest_path_g2_length[0][0]):
+            if sp_len_1 and sp_len_2:
+                error += sp_len_2 - sp_len_1
+            if not sp_len_1:
                 g1_disconnected_pairs += 1
+            if not sp_len_2:
                 g2_disconnected_pairs += 1
-            elif math.isinf(shortest_path_g1_length[0][0]):
-                g1_disconnected_pairs += 1
-            elif math.isinf(shortest_path_g2_length[0][0]):
-                g2_disconnected_pairs += 1
-            else:
-                diff = shortest_path_g2_length[0][0] - shortest_path_g1_length[0][0]
-                error = error + diff
 
     return error, g1_disconnected_pairs, g2_disconnected_pairs
 
 
-#Compute Euclidean distance between two vertices
+def find_vertex(graph: ig.Graph, poi_id: int) -> Optional[int]:
+    vertices = graph.vs.select(id=poi_id)
+    return vertices[0].index if vertices else None
+
+
+def get_shortest_path_length(graph: ig.Graph, v: int, w: int) -> Optional[float]:
+    v, w = find_vertex(graph, v), find_vertex(graph, w)
+    if not v or not w:
+        return None
+    shortest_path_length = graph.distances(v, w, weights='weight')[0][0]
+    if math.isinf(shortest_path_length):
+        return None
+    return shortest_path_length
+
+
 def euclidean_distance(v1, v2, graph):
+    """Compute the Euclidean distance between two vertices in a graph."""
     x1, y1 = graph.vs[v1]['coord']
     x2, y2 = graph.vs[v2]['coord']
     return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
