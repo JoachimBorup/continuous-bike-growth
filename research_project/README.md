@@ -18,7 +18,7 @@ python shapefiles_for_cph/get_cph.py
 
 ## Iterative growth model
 
-Run Jupyter Notebook with the OSMNX kernel. To run the iterative growth model, 
+Run Jupyter Notebook with the OSMNX kernel. To run the iterative growth model,
 open the `iterative_growth_model.ipynb` notebook and run the cells in order.
 You can choose to edit the parameters in the notebook (second code block) to experiment with different settings.
 
@@ -57,3 +57,9 @@ The notebook generates two types of graphs:
 
 - **Abstract Graphs**: High-level representations of the connected POIs.
 - **Routed Graphs**: Detailed graphs showing connections mapped to the actual street network.
+
+### Statistical plots
+
+`\plotting\analysis_plots.ipynb`
+
+- Change the parameters in the notebook as needed and generate statistical graphs for the output.
